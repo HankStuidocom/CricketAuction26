@@ -17,18 +17,25 @@ export interface PlayerAttributes {
 export interface Player {
   id: string;
   name: string;
-  role: PlayerRole;
+  role: PlayerRole | string;
   tier: PlayerTier;
-  nationality: 'INDIAN' | 'OVERSEAS';
-  battingHand: BattingHand;
-  bowlingStyle: BowlingStyle;
-  attributes: PlayerAttributes;
+  nationality?: 'INDIAN' | 'OVERSEAS' | string;
+  battingHand?: BattingHand;
+  bowlingStyle?: BowlingStyle;
+  attributes?: PlayerAttributes;
+  battingRating?: number;
+  bowlingRating?: number;
+  fieldingRating?: number;
+  experienceRating?: number;
   overallRating: number;   // 1-100
   basePrice: number;       // in crores (lakhs as integer, e.g. 20 = 20L)
-  isCapped: boolean;
-  age: number;
-  specialties: string[];
+  isCapped?: boolean;
+  age?: number;
+  specialties?: string[];
   ipoTeam?: string;        // Previous IPL team
+  isSold?: boolean;
+  soldTo?: string | null;
+  soldPrice?: number | null;
 }
 
 // ─── IPL Team Types ────────────────────────────────────────────────────────────

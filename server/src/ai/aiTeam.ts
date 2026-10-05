@@ -71,7 +71,8 @@ export const getAIBid = (
   currentPlayer: Player
 ): Promise<number | null> => {
   return new Promise((resolve) => {
-    const [minDelay, maxDelay] = THINK_TIME[room.settings.aiDifficulty];
+    const rawDiff = ((room.settings?.aiDifficulty || 'medium') as string).toLowerCase() as AIDifficulty;
+    const [minDelay, maxDelay] = THINK_TIME[rawDiff] || THINK_TIME.medium;
     const delay = Math.floor(Math.random() * (maxDelay - minDelay) + minDelay);
 
     setTimeout(() => {
@@ -92,25 +93,26 @@ function computeBid(
   currentPlayer: Player
 ): number | null {
   const personality = aiTeam.aiPersonality ?? 'Balanced';
-  const difficulty = room.settings.aiDifficulty;
+  const rawDiff = ((room.settings?.aiDifficulty || 'medium') as string).toLowerCase() as AIDifficulty;
 
   // ── 1. Squad needs analysis ──────────────────────────────
-  const roleCount = getRoleCounts(aiTeam.players);
-  const roleNeed = assessRoleNeed(roleCount, currentPlayer.role, room.settings.maxSquadSize);
+  const roleCount = getRoleCounts(aiTeam.players || []);
+  const roleNeed = assessRoleNeed(roleCount, currentPlayer.role, room.settings?.maxSquadSize || 15);
 
   // ── 2. Purse management ──────────────────────────────────
-  const playersNeeded = Math.max(0, room.settings.minSquadSize - aiTeam.players.length);
+  const playersNeeded = Math.max(0, (room.settings?.minSquadSize || 11) - (aiTeam.players?.length || 0));
   const reserveNeeded = playersNeeded > 1 ? (playersNeeded - 1) * 25 : 0;
   const effectivePurse = aiTeam.purse - reserveNeeded;
 
   if (effectivePurse <= currentBid) return null; // Can't afford
-  if (aiTeam.players.length >= room.settings.maxSquadSize) return null; // Squad full
+  if ((aiTeam.players?.length || 0) >= (room.settings?.maxSquadSize || 15)) return null; // Squad full
 
   // ── 3. Calculate maximum willingness to pay ──────────────
-  const baseValue = ratingToValue(currentPlayer.overallRating, currentPlayer.basePrice);
-  const personalityMult = PERSONALITY_MULTIPLIER[personality];
-  const roleMult = ROLE_PREFERENCE[personality][currentPlayer.role] ?? 1.0;
-  const difficultyMult = DIFFICULTY_CEILING[difficulty];
+  const baseValue = ratingToValue(currentPlayer.overallRating || 50, currentPlayer.basePrice || 20);
+  const personalityMult = PERSONALITY_MULTIPLIER[personality] || 1.0;
+  const prefMap = ROLE_PREFERENCE[personality] || ROLE_PREFERENCE.Balanced;
+  const roleMult = prefMap[currentPlayer.role] ?? prefMap.Batter ?? 1.0;
+  const difficultyMult = DIFFICULTY_CEILING[rawDiff] || 1.0;
   const roleNeedMult = 1 + roleNeed * 0.2; // Up to 1.4x if role is critically needed
 
   // Randomness: ±10%

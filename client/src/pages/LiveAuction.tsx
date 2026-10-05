@@ -119,7 +119,7 @@ export default function LiveAuction() {
   }
 
   const currentPlayer = auctionState.currentPlayer;
-  const currentBidder = room.teams.find((t) => t.id === auctionState.currentBidderId);
+  const currentBidder = room.teams?.find((t) => t.id === auctionState.currentBidderId);
   const currentBidderIplTeam = currentBidder
     ? currentBidder.iplTeam ||
       IPL_TEAMS.find((t) => t.id === currentBidder.iplTeamId) ||
@@ -143,7 +143,7 @@ export default function LiveAuction() {
           <div className="text-right">
             <div className="text-white/50 text-xs">PLAYERS SOLD</div>
             <div className="text-white font-bold text-sm">
-              {auctionState.soldPlayers.length} / {auctionState.totalPlayers || room.playerPool.length}
+              {(auctionState.soldPlayers || []).length} / {auctionState.totalPlayers || room.playerPool?.length || 60}
             </div>
           </div>
 
@@ -265,9 +265,9 @@ export default function LiveAuction() {
         {/* RIGHT: Teams Sidebar (3 cols) */}
         <div className="lg:col-span-3 space-y-3 max-h-[80vh] overflow-y-auto pr-1">
           <h3 className="text-xs font-bold uppercase tracking-wider text-white/50 px-1">
-            TEAMS PURSE ({room.teams.length})
+            TEAMS PURSE ({(room.teams || []).length})
           </h3>
-          {room.teams.map((t) => (
+          {(room.teams || []).map((t) => (
             <TeamCard
               key={t.id}
               team={t}
@@ -280,12 +280,12 @@ export default function LiveAuction() {
 
       {/* Full screen Sold Overlay notification */}
       <AnimatePresence>
-        {auctionState.phase === 'SOLD' && currentPlayer && currentBidder && currentBidderIplTeam && (
+        {auctionState.phase === 'SOLD' && currentPlayer && currentBidder && (
           <SoldOverlay
             soldRecord={{
               player: currentPlayer,
               teamId: currentBidder.id,
-              teamName: currentBidderIplTeam.name,
+              teamName: currentBidderIplTeam?.name || currentBidder.managerName || 'Winning Team',
               price: auctionState.currentBid,
               timestamp: Date.now(),
             }}

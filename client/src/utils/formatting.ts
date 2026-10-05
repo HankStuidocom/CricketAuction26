@@ -16,27 +16,25 @@ export function formatPoints(lakhs: number): string {
 /**
  * Get Tailwind color class for player role
  */
-export function getRoleColor(role: PlayerRole): string {
-  switch (role) {
-    case 'BAT': return 'bg-blue-500/20 text-blue-300 border-blue-500/40';
-    case 'BOWL': return 'bg-red-500/20 text-red-300 border-red-500/40';
-    case 'AR': return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
-    case 'WK': return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
-    default: return 'bg-gray-500/20 text-gray-300 border-gray-500/40';
-  }
+export function getRoleColor(role: PlayerRole | string): string {
+  const r = (role || '').toUpperCase();
+  if (r.startsWith('BAT')) return 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+  if (r.startsWith('BOWL')) return 'bg-red-500/20 text-red-300 border-red-500/40';
+  if (r.includes('ALL') || r === 'AR') return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+  if (r.includes('WICKET') || r === 'WK') return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40';
+  return 'bg-gray-500/20 text-gray-300 border-gray-500/40';
 }
 
 /**
  * Get role label
  */
-export function getRoleLabel(role: PlayerRole): string {
-  switch (role) {
-    case 'BAT': return 'Batsman';
-    case 'BOWL': return 'Bowler';
-    case 'AR': return 'All-Rounder';
-    case 'WK': return 'Wicket Keeper';
-    default: return role;
-  }
+export function getRoleLabel(role: PlayerRole | string): string {
+  const r = (role || '').toUpperCase();
+  if (r === 'BAT' || r === 'BATTER') return 'Batsman';
+  if (r === 'BOWL' || r === 'BOWLER') return 'Bowler';
+  if (r === 'AR' || r.includes('ALL')) return 'All-Rounder';
+  if (r === 'WK' || r.includes('WICKET')) return 'Wicket Keeper';
+  return role || 'Player';
 }
 
 /**
@@ -117,10 +115,13 @@ export function getTeamColor(teamId: string): string {
 /**
  * Get initials from player name
  */
-export function getInitials(name: string): string {
+export function getInitials(name?: string): string {
+  if (!name) return '?';
   return name
-    .split(' ')
+    .trim()
+    .split(/\s+/)
     .map(word => word[0])
+    .filter(Boolean)
     .join('')
     .slice(0, 2)
     .toUpperCase();

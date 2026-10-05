@@ -167,6 +167,12 @@ export default function PlayerCard({
     );
   }
 
+  // Safely extract attributes regardless of schema (attributes object or individual rating fields)
+  const batting = player.attributes?.batting ?? player.battingRating ?? player.overallRating ?? 50;
+  const bowling = player.attributes?.bowling ?? player.bowlingRating ?? player.overallRating ?? 50;
+  const fielding = player.attributes?.fielding ?? player.fieldingRating ?? player.overallRating ?? 50;
+  const experience = player.attributes?.experience ?? player.experienceRating ?? player.overallRating ?? 50;
+
   // ── Auction variant (large) ──────────────────────────────────────────────────
   return (
     <motion.div
@@ -240,10 +246,10 @@ export default function PlayerCard({
 
       {/* Attributes */}
       <div className="px-5 py-3 space-y-2 border-t border-white/10">
-        <AttributeBar label="BAT" value={player.attributes.batting} />
-        <AttributeBar label="BOWL" value={player.attributes.bowling} />
-        <AttributeBar label="FIELD" value={player.attributes.fielding} />
-        <AttributeBar label="EXP" value={player.attributes.experience} />
+        <AttributeBar label="BAT" value={batting} />
+        <AttributeBar label="BOWL" value={bowling} />
+        <AttributeBar label="FIELD" value={fielding} />
+        <AttributeBar label="EXP" value={experience} />
       </div>
 
       {/* Specialties */}
