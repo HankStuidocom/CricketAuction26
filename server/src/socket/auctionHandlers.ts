@@ -28,26 +28,33 @@ export function registerAuctionHandlers(
       const room = getRoom(data);
       if (!room) {
         if (callback) callback({ success: false, error: 'Room not found' });
-        return;
-      }
-      if (room.hostId !== socket.id) {
-        if (callback) callback({ success: false, error: 'Host only' });
-        return;
-      }
-      if (room.status !== 'lobby') {
-        if (callback) callback({ success: false, error: 'Auction already in progress' });
+        socket.emit('error', { message: 'Room not found' });
         return;
       }
 
-      const humanTeams = room.teams.filter((t) => !t.isAI);
-      const allReady = humanTeams.every((t) => t.isReady || t.id === room.hostId);
-      if (!allReady) {
-        if (callback) callback({ success: false, error: 'Not all teams are ready' });
+      const isHost =
+        room.hostId === socket.id ||
+        room.teams[0]?.id === socket.id ||
+        room.teams.some((t) => t.id === socket.id && (t.id === room.hostId || room.hostId.startsWith('rest_')));
+
+      if (!isHost) {
+        if (callback) callback({ success: false, error: 'Host only' });
+        socket.emit('error', { message: 'Host only can start the auction' });
+        return;
+      }
+
+      // Update hostId to current active socket
+      room.hostId = socket.id;
+
+      if (room.status !== 'lobby' && room.status !== 'auction') {
+        if (callback) callback({ success: false, error: 'Auction already in progress' });
         return;
       }
 
       auctionEngine.startAuction(room);
       io.to(room.code).emit('auctionStarted', { code: room.code });
+      io.to(room.code).emit('room:updated', sanitizeRoom(room));
+      io.to(room.code).emit('roomUpdated', sanitizeRoom(room));
       if (callback) callback({ success: true });
 
       // Schedule AI bids whenever a player is shown

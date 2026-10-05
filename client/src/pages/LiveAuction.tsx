@@ -15,16 +15,59 @@ import { SERVER_URL, IPL_TEAMS } from '../utils/constants';
 export default function LiveAuction() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, socket, myTeamId, initSocket, isConnected } = useGameStore();
+  const { room, socket, myTeamId, initSocket, isConnected, setRoom, setAuctionState } = useGameStore();
   const { auctionState, myTeam, canBid, placeBid } = useAuction();
   const [isPaused, setIsPaused] = useState(false);
 
-  // Initialize socket connection if needed
+  // Initialize socket connection & fetch room state on mount
   useEffect(() => {
     if (!isConnected) {
       initSocket(SERVER_URL);
     }
   }, [isConnected, initSocket]);
+
+  // Fetch room & auction state
+  useEffect(() => {
+    if (!roomCode) return;
+
+    const fetchAuctionRoom = async () => {
+      try {
+        const res = await fetch(`${SERVER_URL}/api/rooms/${roomCode}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.room) {
+            setRoom(data.room);
+            if (data.room.currentAuction) {
+              setAuctionState({
+                currentPlayer: data.room.currentAuction.currentPlayer,
+                currentBid: data.room.currentAuction.currentBid,
+                currentBidderId: data.room.currentAuction.currentBidderId,
+                currentBidderName: null,
+                phase: data.room.currentAuction.isPaused ? 'WAITING' : 'BIDDING',
+                timeRemaining: data.room.currentAuction.timerSeconds ?? 15,
+                soldPlayers: data.room.currentAuction.soldPlayers ?? [],
+                unsoldPlayers: data.room.currentAuction.unsoldPlayers ?? [],
+                playerIndex: 0,
+                totalPlayers: data.room.playerPool?.length ?? 60,
+                lastBidTimestamp: Date.now(),
+              });
+            }
+          }
+        }
+      } catch {
+        // silent
+      }
+    };
+
+    fetchAuctionRoom();
+
+    if (socket && isConnected) {
+      socket.emit('joinRoom', { roomCode, teamId: myTeamId });
+    }
+
+    const interval = setInterval(fetchAuctionRoom, 2000);
+    return () => clearInterval(interval);
+  }, [roomCode, socket, isConnected, myTeamId, setRoom, setAuctionState]);
 
   // Navigate when room status changes
   useEffect(() => {
@@ -40,7 +83,11 @@ export default function LiveAuction() {
     }
   }, [room?.status, room?.code, navigate]);
 
-  const isHost = room && socket && room.hostId === socket.id;
+  const isHost = Boolean(
+    (socket?.id && room?.hostId && socket.id === room.hostId) ||
+    (myTeamId && room?.hostId && myTeamId === room.hostId) ||
+    (room?.teams?.length && (room.teams[0].id === myTeamId || room.teams[0].id === socket?.id))
+  );
 
   const handlePauseResume = () => {
     if (!socket || !room) return;
