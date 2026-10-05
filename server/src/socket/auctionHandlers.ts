@@ -4,6 +4,7 @@ import { AuctionEngine } from '../engine/auctionEngine';
 import { getAIBid } from '../ai/aiTeam';
 import { simulateLeague } from '../engine/t20Simulator';
 import { calculateTeamRating, calculateFinalScore } from '../engine/teamRating';
+import { sanitizeRoom } from './roomHandlers';
 
 export function registerAuctionHandlers(
   io: Server,
