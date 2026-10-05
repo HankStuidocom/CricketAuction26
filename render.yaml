@@ -2,6 +2,7 @@ services:
   - type: web
     name: cricket-auction-26-server
     env: node
+    plan: free
     rootDir: server
     buildCommand: npm install && npm run build
     startCommand: node dist/index.js
