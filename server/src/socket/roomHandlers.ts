@@ -100,7 +100,7 @@ export function registerRoomHandlers(
     }
   );
 
-  // ── joinRoom ────────────────────────────────────────────
+  // ── joinRoom & syncRoom ───────────────────────────────────
   socket.on(
     'joinRoom',
     (
@@ -118,6 +118,29 @@ export function registerRoomHandlers(
           socket.emit('error', { message: 'Room not found' });
           return;
         }
+
+        socket.join(code);
+
+        // Check if player is re-syncing/joining an existing team slot (e.g. Host created via REST)
+        let existingTeam = room.teams.find(
+          (t) => t.id === socket.id || (data.teamId && t.id === data.teamId) || (targetIplTeamId && t.iplTeamId === targetIplTeamId && !t.isAI)
+        );
+
+        if (existingTeam) {
+          const oldId = existingTeam.id;
+          existingTeam.id = socket.id;
+          if (data.managerName) existingTeam.managerName = data.managerName;
+          if (room.hostId === oldId || room.hostId.startsWith('rest_') || room.teams[0]?.id === socket.id) {
+            room.hostId = socket.id;
+          }
+          console.log(`[Room] ${socket.id} re-synced existing team ${existingTeam.iplTeamId} in ${code}`);
+          const sanitized = sanitizeRoom(room);
+          if (callback) callback({ success: true, room: sanitized });
+          socket.emit('roomJoined', { room: sanitized, teamId: existingTeam.id });
+          broadcastRoomUpdate(room);
+          return;
+        }
+
         if (room.status !== 'lobby') {
           if (callback) callback({ success: false, error: 'Auction already started' });
           socket.emit('error', { message: 'Auction already started' });
@@ -129,7 +152,7 @@ export function registerRoomHandlers(
           return;
         }
 
-        // Prevent duplicate IPL team selection
+        // Prevent duplicate IPL team selection among OTHER teams
         if (room.teams.some((t) => t.iplTeamId === targetIplTeamId)) {
           if (callback) callback({ success: false, error: 'IPL team already taken' });
           socket.emit('error', { message: 'IPL team already taken' });
@@ -158,7 +181,6 @@ export function registerRoomHandlers(
         };
 
         room.teams.push(newTeam);
-        socket.join(code);
 
         console.log(`[Room] ${socket.id} joined ${code}`);
         const sanitized = sanitizeRoom(room);

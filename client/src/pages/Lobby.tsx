@@ -6,7 +6,7 @@ import { Copy, Check, Users, Play, Wifi } from 'lucide-react';
 import { useGameStore } from '../store/gameStore';
 import { useSocket } from '../hooks/useSocket';
 import { GameTeam } from '../types';
-import { IPL_TEAMS } from '../utils/constants';
+import { IPL_TEAMS, SERVER_URL } from '../utils/constants';
 import clsx from 'clsx';
 
 function TeamSlot({ team, isMe, isHost }: { team?: GameTeam; isMe?: boolean; isHost?: boolean }) {
@@ -71,22 +71,58 @@ function TeamSlot({ team, isMe, isHost }: { team?: GameTeam; isMe?: boolean; isH
 export default function Lobby() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  const { room, myTeamId, socket } = useGameStore();
+  const { room, myTeamId, socket, setRoom } = useGameStore();
   const { isConnected } = useSocket();
 
   const [copied, setCopied] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
-  const myTeam = room?.teams.find(t => t.id === myTeamId);
-  const isHost = socket?.id === room?.hostId;
+  const myTeam = room?.teams.find(t => t.id === myTeamId || t.id === socket?.id);
+  const isHost = Boolean(
+    (socket?.id && room?.hostId && socket.id === room.hostId) ||
+    (myTeamId && room?.hostId && myTeamId === room.hostId) ||
+    (room?.teams?.length && (room.teams[0].id === myTeamId || room.teams[0].id === socket?.id))
+  );
   const allReadyOrAI = room?.teams.every(t => t.isReady || t.isAI) ?? false;
+
+  // Sync socket channel & poll room state
+  useEffect(() => {
+    if (!roomCode) return;
+
+    const fetchRoom = async () => {
+      try {
+        const res = await fetch(`${SERVER_URL}/api/rooms/${roomCode}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.room) {
+            setRoom(data.room);
+          }
+        }
+      } catch {
+        // silent
+      }
+    };
+
+    fetchRoom();
+
+    if (socket && isConnected) {
+      socket.emit('joinRoom', { roomCode, teamId: myTeamId });
+    }
+
+    const interval = setInterval(fetchRoom, 1500);
+    return () => clearInterval(interval);
+  }, [roomCode, socket, isConnected, myTeamId, setRoom]);
 
   // Listen for auction start
   useEffect(() => {
     if (!socket) return;
     const onStart = () => navigate(`/auction/${roomCode}`);
     socket.on('auctionStarted', onStart);
-    return () => { socket.off('auctionStarted', onStart); };
+    socket.on('auction:playerShown', onStart);
+    return () => {
+      socket.off('auctionStarted', onStart);
+      socket.off('auction:playerShown', onStart);
+    };
   }, [socket, navigate, roomCode]);
 
   // Redirect if auction already running
