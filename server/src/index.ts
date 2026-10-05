@@ -80,11 +80,11 @@ app.post('/api/rooms/create', (req: Request, res: Response) => {
     } while (rooms.has(code));
 
     const defaultSettings = {
-      startingPurse: 900,
+      startingPurse: 8000,
       auctionTimer: 15,
       playerPoolSize: 60,
-      minSquadSize: 11,
-      maxSquadSize: 15,
+      minSquadSize: 2,
+      maxSquadSize: 10,
       aiDifficulty: 'medium' as const,
     };
 

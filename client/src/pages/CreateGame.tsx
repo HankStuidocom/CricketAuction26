@@ -15,7 +15,11 @@ export default function CreateGame() {
 
   const [selectedTeam, setSelectedTeam] = useState<IPLTeam | null>(null);
   const [managerName, setManagerName] = useState('');
-  const [purse, setPurse] = useState(1000);
+  const [purse, setPurse] = useState(8000); // 80 Cr default
+  const [isCustomPurse, setIsCustomPurse] = useState(false);
+  const [customPurseCr, setCustomPurseCr] = useState(80);
+  const [minSquadSize, setMinSquadSize] = useState(2);
+  const [maxSquadSize, setMaxSquadSize] = useState(10);
   const [timer, setTimer] = useState(10);
   const [playerPool, setPlayerPool] = useState<'QUICK' | 'FULL' | 'CUSTOM'>('FULL');
   const [customCount, setCustomCount] = useState(30);
@@ -32,8 +36,12 @@ export default function CreateGame() {
     try {
       const socket = initSocket(SERVER_URL);
 
+      const finalPurse = isCustomPurse ? customPurseCr * 100 : purse;
+
       const settings = {
-        startingPurse: purse,
+        startingPurse: finalPurse,
+        minSquadSize,
+        maxSquadSize,
         bidTimerSeconds: timer,
         playerPool,
         customPlayerCount: playerPool === 'CUSTOM' ? customCount : undefined,
@@ -204,14 +212,15 @@ export default function CreateGame() {
               {/* Starting Purse */}
               <div className="mb-6">
                 <label className="label">Starting Purse</label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-5 gap-2">
                   {PURSE_OPTIONS.map(opt => (
                     <button
                       key={opt.value}
-                      onClick={() => setPurse(opt.value)}
+                      type="button"
+                      onClick={() => { setPurse(opt.value); setIsCustomPurse(false); }}
                       className={clsx(
-                        'py-3 px-4 rounded-xl border-2 font-bold text-sm transition-all',
-                        purse === opt.value
+                        'py-3 px-2 rounded-xl border-2 font-bold text-sm transition-all text-center',
+                        !isCustomPurse && purse === opt.value
                           ? 'border-gold bg-gold/20 text-gold'
                           : 'border-white/10 text-white/60 hover:border-white/30'
                       )}
@@ -219,6 +228,58 @@ export default function CreateGame() {
                       {opt.label}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomPurse(true)}
+                    className={clsx(
+                      'py-3 px-2 rounded-xl border-2 font-bold text-sm transition-all text-center',
+                      isCustomPurse
+                        ? 'border-gold bg-gold/20 text-gold'
+                        : 'border-white/10 text-white/60 hover:border-white/30'
+                    )}
+                  >
+                    ⚙️ Custom
+                  </button>
+                </div>
+                {isCustomPurse && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3">
+                    <label className="label">Custom Purse (in Crores ₹)</label>
+                    <input
+                      type="number"
+                      value={customPurseCr}
+                      onChange={e => setCustomPurseCr(Math.max(1, Number(e.target.value)))}
+                      min={1}
+                      max={500}
+                      className="input-field"
+                      placeholder="e.g. 80"
+                    />
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Squad Limits */}
+              <div className="mb-6 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Min Squad Size</label>
+                  <input
+                    type="number"
+                    value={minSquadSize}
+                    onChange={e => setMinSquadSize(Math.max(1, Number(e.target.value)))}
+                    min={1}
+                    max={15}
+                    className="input-field text-center font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="label">Max Squad Size</label>
+                  <input
+                    type="number"
+                    value={maxSquadSize}
+                    onChange={e => setMaxSquadSize(Math.max(minSquadSize, Number(e.target.value)))}
+                    min={minSquadSize}
+                    max={25}
+                    className="input-field text-center font-bold"
+                  />
                 </div>
               </div>
 
@@ -346,7 +407,11 @@ export default function CreateGame() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/50">Purse</span>
-                  <span className="font-bold text-gold">₹{purse}L</span>
+                  <span className="font-bold text-gold">₹{isCustomPurse ? customPurseCr : purse / 100} Cr</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/50">Squad Limit</span>
+                  <span className="font-bold text-white">{minSquadSize} - {maxSquadSize} players</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/50">Timer</span>

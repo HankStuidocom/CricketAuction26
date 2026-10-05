@@ -99,9 +99,10 @@ export const TIER_LABELS: Record<string, string> = {
 };
 
 export const PURSE_OPTIONS = [
-  { label: '₹500 Lakhs', value: 500 },
-  { label: '₹1000 Lakhs', value: 1000 },
-  { label: '₹1500 Lakhs', value: 1500 },
+  { label: '₹80 Cr', value: 8000 },
+  { label: '₹100 Cr', value: 10000 },
+  { label: '₹120 Cr', value: 12000 },
+  { label: '₹150 Cr', value: 15000 },
 ];
 
 export const TIMER_OPTIONS = [
@@ -118,7 +119,7 @@ export const PLAYER_POOL_OPTIONS = [
 
 export const SERVER_URL = (() => {
   const envUrl = (import.meta as any).env?.VITE_SERVER_URL;
-  if (envUrl) return envUrl;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim()) return envUrl.trim();
 
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
@@ -129,6 +130,6 @@ export const SERVER_URL = (() => {
       return `http://${host}:3001`;
     }
   }
-  return 'http://localhost:3001';
+  return 'https://cricket-auction-26-server.onrender.com';
 })();
 
