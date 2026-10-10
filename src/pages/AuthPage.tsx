@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { safeFetch } from '../lib/api';
-import { Trophy, Shield, KeyRound, Sparkles, ArrowLeft } from 'lucide-react';
+import GameButton from '../components/GameButton';
+import GamePanel from '../components/GamePanel';
+import { CricketBatBallIcon, TrophyCupIcon, ShieldCrestIcon } from '../components/GameIcons';
+import { ArrowLeft, AlertCircle } from 'lucide-react';
 
 export default function AuthPage({ isRegister = false }: { isRegister?: boolean }) {
   const navigate = useNavigate();
@@ -22,14 +25,14 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
       : { username, password };
 
     try {
-      const data = await safeFetch(endpoint, {
+      const data = await safeFetch<any>(endpoint, {
         method: 'POST',
         body: JSON.stringify(body)
       });
 
       if (isRegister) {
         // Auto login after register
-        const loginData = await safeFetch('/api/auth/login', {
+        const loginData = await safeFetch<any>('/api/auth/login', {
           method: 'POST',
           body: JSON.stringify({ username, password })
         });
@@ -51,9 +54,10 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#05172E] via-[#020B18] to-[#020A16] text-[#F5F7FF] flex flex-col justify-center items-center px-4 py-8 relative font-['DM_Sans',sans-serif]">
+    <div className="min-h-screen bg-[#020814] text-[#F8FAFC] flex flex-col justify-center items-center px-4 py-8 relative font-['DM_Sans',sans-serif]">
+      
       {/* Top Header with Back Navigation */}
-      <div className="w-full max-w-md flex items-center justify-between mb-4">
+      <div className="w-full max-w-md flex items-center justify-between mb-4 pb-3 border-b border-white/8">
         <button
           onClick={() => navigate('/')}
           className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8993A8] hover:text-white transition"
@@ -62,9 +66,11 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
           <ArrowLeft size={18} />
         </button>
 
-        <div className="flex items-center gap-2">
-          <i className="brand-mark"></i>
-          <span className="font-extrabold text-lg tracking-tight font-['Manrope']">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#102D5E] to-[#08152E] border border-white/15 flex items-center justify-center">
+            <CricketBatBallIcon size={16} color="#D9FF4D" />
+          </div>
+          <span className="font-['Manrope'] font-black text-lg tracking-tight">
             Crick<span className="text-[#D9FF4D]">Auction</span>
           </span>
         </div>
@@ -72,13 +78,13 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
         <div className="w-10"></div>
       </div>
 
-      <div className="w-full max-w-md bg-[#0B1730] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl relative">
+      <GamePanel glow="none" className="w-full max-w-md p-6 sm:p-8">
         <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-[#061224] border border-white/10 mb-3 text-[#D9FF4D]">
-            <Trophy size={28} />
+          <div className="inline-flex p-3 rounded-2xl bg-[#091B3A] border border-[#D9FF4D]/30 mb-3 text-[#D9FF4D] shadow-[0_0_20px_rgba(217,255,77,0.25)]">
+            <TrophyCupIcon size={28} color="#D9FF4D" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-['Manrope'] text-white">
-            {isRegister ? 'Create Player Account' : 'Welcome Back'}
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-['Manrope'] text-white">
+            {isRegister ? 'Create Player Profile' : 'Player Sign In'}
           </h1>
           <p className="text-xs sm:text-sm text-[#8993A8] mt-1">
             {isRegister ? 'Join the IPL 2026 multiplayer auction arena' : 'Sign in to access your squad and rooms'}
@@ -86,31 +92,30 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs sm:text-sm font-medium text-center">
-            {error}
+          <div className="mb-6 p-3.5 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-xs sm:text-sm font-medium text-center flex items-center justify-center gap-2">
+            <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+            <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
               Username
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. virat_fan_18"
-                className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] transition"
-              />
-            </div>
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g. captain_rohit_45"
+              className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold transition"
+            />
           </div>
 
           {isRegister && (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
                 Display Name
               </label>
               <input
@@ -118,14 +123,14 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
                 required
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="e.g. Captain VK"
-                className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] transition"
+                placeholder="e.g. Hitman Sharma"
+                className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold transition"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
               Password
             </label>
             <input
@@ -134,37 +139,42 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] transition"
+              className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold transition"
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-2 py-3.5 bg-[#D9FF4D] hover:bg-[#c7f035] text-[#07111E] font-black text-xs uppercase tracking-wider rounded-xl transition shadow-[0_0_20px_rgba(217,255,77,0.3)] disabled:opacity-50"
-          >
-            {loading ? 'Processing...' : (isRegister ? 'CREATE ACCOUNT' : 'SIGN IN')}
-          </button>
+          <div className="pt-2">
+            <GameButton
+              type="submit"
+              disabled={loading}
+              loading={loading}
+              variant="primary"
+              size="lg"
+              fullWidth
+            >
+              {isRegister ? 'CREATE ACCOUNT' : 'ENTER ARENA'}
+            </GameButton>
+          </div>
         </form>
 
-        <div className="mt-6 text-center text-xs text-[#8993A8]">
+        <div className="mt-6 text-center text-xs text-[#8993A8] border-t border-white/8 pt-4">
           {isRegister ? (
             <p>
-              Already have an account?{' '}
+              Already registered?{' '}
               <Link to="/login" className="text-[#D9FF4D] font-bold hover:underline">
-                Sign in
+                Sign in to your profile
               </Link>
             </p>
           ) : (
             <p>
-              Don't have an account?{' '}
+              New to the auction?{' '}
               <Link to="/register" className="text-[#D9FF4D] font-bold hover:underline">
-                Register now
+                Create a player profile
               </Link>
             </p>
           )}
         </div>
-      </div>
+      </GamePanel>
     </div>
   );
 }

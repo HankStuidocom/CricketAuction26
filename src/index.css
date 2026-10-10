@@ -1,48 +1,73 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0B1120;
-  --bg-card: #111827;
-  --bg-card-hover: #1a2236;
-  --bg-surface: #151E30;
-  --text-primary: #F9FAFB;
-  --text-secondary: #9CA3AF;
-  --text-muted: #6B7280;
-  --accent-lime: #84CC16;
-  --accent-gold: #F59E0B;
-  --accent-red: #EF4444;
-  --accent-blue: #3B82F6;
-  --border: rgba(255,255,255,0.08);
-  --border-strong: rgba(255,255,255,0.15);
+  --bg-primary: #020814;
+  --bg-card: #081124;
+  --bg-card-hover: #0E1B38;
+  --bg-surface: #0B1730;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --accent-lime: #D9FF4D;
+  --accent-gold: #FFB800;
+  --accent-red: #FF3366;
+  --accent-blue: #00E5FF;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
 }
 
-* { box-sizing: border-box; }
+* { 
+  box-sizing: border-box; 
+}
 
-html { height: 100%; }
+html { 
+  height: 100%; 
+}
 
 body {
   background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(ellipse 120% 60% at 50% -10%, rgba(23, 105, 255, 0.18), transparent 70%),
+    radial-gradient(circle at 50% 100%, rgba(2, 8, 20, 0.9), #01040A);
   color: var(--text-primary);
-  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: var(--bg-primary); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+/* Accessible focus styling */
+:focus-visible {
+  outline: 2px solid var(--accent-lime);
+  outline-offset: 2px;
+}
 
+::-webkit-scrollbar { 
+  width: 5px; 
+  height: 5px; 
+}
+::-webkit-scrollbar-track { 
+  background: #020814; 
+}
+::-webkit-scrollbar-thumb { 
+  background: rgba(255, 255, 255, 0.18); 
+  border-radius: 4px; 
+}
+::-webkit-scrollbar-thumb:hover { 
+  background: rgba(217, 255, 77, 0.4); 
+}
+
+/* Animations */
 @keyframes pulse-urgent {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.75; transform: scale(0.97); }
+  50% { opacity: 0.8; transform: scale(0.96); }
 }
 @keyframes sold-flash {
-  0% { opacity: 0; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1.05); }
+  0% { opacity: 0; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1.04); }
   100% { opacity: 1; transform: scale(1); }
 }
 @keyframes fade-in-up {
-  0% { opacity: 0; transform: translateY(16px); }
+  0% { opacity: 0; transform: translateY(14px); }
   100% { opacity: 1; transform: translateY(0); }
 }
 @keyframes shimmer {
@@ -53,14 +78,19 @@ body {
   0% { transform: translateY(100%); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
+@keyframes glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 12px rgba(217, 255, 77, 0.4)); }
+  50% { filter: drop-shadow(0 0 24px rgba(217, 255, 77, 0.7)); }
+}
 
-.animate-pulse-urgent { animation: pulse-urgent 0.6s ease-in-out infinite; }
-.animate-sold { animation: sold-flash 0.4s ease-out forwards; }
-.animate-fade-up { animation: fade-in-up 0.3s ease-out forwards; }
+.animate-pulse-urgent { animation: pulse-urgent 0.5s ease-in-out infinite; }
+.animate-sold { animation: sold-flash 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-up { animation: fade-in-up 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+.animate-glow-pulse { animation: glow-pulse 2s ease-in-out infinite; }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+  background: linear-gradient(90deg, #09152B 25%, #132448 50%, #09152B 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
@@ -68,14 +98,15 @@ body {
 
 .pitch-bg {
   background-image:
-    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
-.glow-lime { box-shadow: 0 0 24px rgba(132, 204, 22, 0.3); }
-.glow-gold { box-shadow: 0 0 24px rgba(245, 158, 11, 0.3); }
-.glow-red  { box-shadow: 0 0 24px rgba(239, 68, 68, 0.3); }
+.glow-lime { box-shadow: 0 0 28px rgba(217, 255, 77, 0.3); }
+.glow-gold { box-shadow: 0 0 28px rgba(255, 184, 0, 0.3); }
+.glow-red  { box-shadow: 0 0 28px rgba(255, 51, 102, 0.3); }
+.glow-cyan { box-shadow: 0 0 28px rgba(0, 229, 255, 0.3); }
 
 /* Cricket Ball Animation */
 .cricket-ball {
@@ -83,7 +114,7 @@ body {
   height: 80px;
   border-radius: 50%;
   margin: auto;
-  background: radial-gradient(circle at 33% 27%, #fff, #d6d8dc 65%);
+  background: radial-gradient(circle at 33% 27%, #ffffff, #d6d8dc 65%);
   box-shadow: 0 18px 36px rgba(0,0,0,0.6);
   position: relative;
   animation: ball-spin 2s ease-in-out infinite;
@@ -143,14 +174,13 @@ body {
 /* Live card dot grid */
 .live-grid-pattern {
   position: absolute;
-  width: 190px;
-  height: 190px;
-  right: 20%;
-  top: 15px;
-  background: radial-gradient(circle, rgba(43, 60, 123, 0.4) 0 1px, transparent 2px);
-  background-size: 12px 12px;
-  opacity: 0.5;
-  transform: rotate(20deg);
+  width: 220px;
+  height: 220px;
+  right: 15%;
+  top: 10px;
+  background: radial-gradient(circle, rgba(79, 172, 254, 0.3) 0 1.5px, transparent 2px);
+  background-size: 14px 14px;
+  opacity: 0.4;
+  transform: rotate(18deg);
   pointer-events: none;
 }
-
