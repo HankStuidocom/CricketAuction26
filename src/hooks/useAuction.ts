@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getSocketUrl } from '../lib/api';
 
-export function useAuction(roomCode: string, myFranchise?: string) {
+export function useAuction(roomCode: string, myFranchise?: string, myUserId?: string) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [roomState, setRoomState] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,11 @@ export function useAuction(roomCode: string, myFranchise?: string) {
 
     newSocket.on('connect', () => {
       setConnected(true);
-      newSocket.emit('join_room', { roomCode, franchise: myFranchise });
+      newSocket.emit('join_room', { 
+        roomCode, 
+        franchise: myFranchise,
+        userId: myUserId || 'guest-' + Math.random().toString(36).substring(7)
+      });
     });
 
     newSocket.on('disconnect', () => {
@@ -46,7 +50,7 @@ export function useAuction(roomCode: string, myFranchise?: string) {
     return () => {
       newSocket.disconnect();
     };
-  }, [roomCode, myFranchise]);
+  }, [roomCode, myFranchise, myUserId]);
 
   const placeBid = useCallback((amount?: number) => {
     if (socket && roomCode && myFranchise) {
@@ -60,10 +64,10 @@ export function useAuction(roomCode: string, myFranchise?: string) {
   }, [socket, roomCode, myFranchise]);
 
   const hostAction = useCallback((action: 'pause' | 'resume' | 'skip' | 'mark_unsold') => {
-    if (socket && roomCode) {
-      socket.emit(`host_${action}`, { roomCode });
+    if (socket && roomCode && myUserId) {
+      socket.emit(`host_${action}`, { roomCode, userId: myUserId });
     }
-  }, [socket, roomCode]);
+  }, [socket, roomCode, myUserId]);
 
   const sendChat = useCallback((message: string, sender: string) => {
     if (socket && roomCode) {

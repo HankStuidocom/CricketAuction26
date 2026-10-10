@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ALL_FRANCHISES } from '../lib/utils';
+import { ALL_FRANCHISES, getOrCreateUserId, saveRoomSession } from '../lib/utils';
 import { safeFetch } from '../lib/api';
 import { Shield, Settings2, CheckCircle2, ChevronRight, ChevronLeft, Lock } from 'lucide-react';
 
@@ -22,6 +22,7 @@ export default function CreateAuction() {
   // Step 2: Settings
   const [roomName, setRoomName] = useState('IPL 2026 Mega Arena');
   const [isPrivate, setIsPrivate] = useState(false);
+  const [password, setPassword] = useState('');
   const [maxTeams, setMaxTeams] = useState(10);
   const [maxSquadSize, setMaxSquadSize] = useState(10);
   const [startingPurseCr, setStartingPurseCr] = useState(120);
@@ -37,11 +38,7 @@ export default function CreateAuction() {
     setLoading(true);
     setError('');
 
-    let hostId = 'guest-host';
-    try {
-      const user = JSON.parse(localStorage.getItem('ca26_user') || '{}');
-      if (user.id) hostId = user.id;
-    } catch {}
+    const hostId = getOrCreateUserId();
 
     const payload = {
       hostId,
@@ -50,6 +47,7 @@ export default function CreateAuction() {
       roomConfig: {
         name: roomName,
         isPrivate,
+        password,
         maxTeams,
         maxSquadSize,
         startingPurse: startingPurseCr * 100, // into Lakhs
@@ -66,8 +64,15 @@ export default function CreateAuction() {
         body: JSON.stringify(payload)
       });
       
+      saveRoomSession(data.roomCode, {
+        franchise: selectedFranchise,
+        displayName,
+        userId: hostId,
+        password: isPrivate ? password : undefined
+      });
+
       navigate(`/room/${data.roomCode}`, {
-        state: { displayName, franchise: selectedFranchise }
+        state: { displayName, franchise: selectedFranchise, userId: hostId }
       });
     } catch (err: any) {
       setError(err.message);
@@ -124,25 +129,38 @@ export default function CreateAuction() {
                       key={team.id}
                       type="button"
                       onClick={() => setSelectedFranchise(team.id)}
-                      className={`relative p-4 rounded-xl border text-left transition flex flex-col justify-between h-32 ${
+                      className={`group relative p-3 sm:p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-between min-h-[150px] sm:min-h-[165px] ${
                         isSelected 
-                          ? 'border-[#B6FF3B] bg-[#181B21] shadow-[0_0_15px_rgba(182,255,59,0.2)]' 
-                          : 'border-[rgba(255,255,255,0.08)] bg-[#111318] hover:border-[rgba(255,255,255,0.2)]'
+                          ? 'border-[#B6FF3B] bg-[#181B21] shadow-[0_0_20px_rgba(182,255,59,0.25)] scale-[1.02]' 
+                          : 'border-[rgba(255,255,255,0.08)] bg-[#111318] hover:border-[rgba(255,255,255,0.25)] hover:bg-[#15181F]'
                       }`}
                     >
-                      <div className="flex justify-between items-start">
+                      {/* Selected Checkmark Badge */}
+                      {isSelected && (
+                        <div className="absolute top-2.5 right-2.5 text-[#B6FF3B]">
+                          <CheckCircle2 size={18} />
+                        </div>
+                      )}
+
+                      {/* Prominent Centered Logo */}
+                      <div className="w-full flex-1 flex items-center justify-center py-1 sm:py-2">
                         {team.logoUrl ? (
-                          <img src={team.logoUrl} alt={team.id} className="w-10 h-10 object-contain drop-shadow-md" />
+                          <img 
+                            src={team.logoUrl} 
+                            alt={team.id} 
+                            className="h-16 sm:h-20 w-auto max-w-[85%] object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] transition-transform duration-200 group-hover:scale-105" 
+                          />
                         ) : (
-                          <span className="text-2xl">{team.emoji}</span>
+                          <span className="text-3xl sm:text-4xl">{team.emoji}</span>
                         )}
-                        {isSelected && <CheckCircle2 size={18} className="text-[#B6FF3B]" />}
                       </div>
-                      <div>
-                        <div className="text-lg font-black" style={{ color: team.primary }}>
+
+                      {/* Team Name & Code */}
+                      <div className="w-full text-center mt-1">
+                        <div className="text-base sm:text-lg font-black tracking-wider leading-tight" style={{ color: team.primary }}>
                           {team.id}
                         </div>
-                        <div className="text-xs text-[#A3A7B0] truncate">
+                        <div className="text-[11px] sm:text-xs text-[#A3A7B0] truncate font-medium mt-0.5">
                           {team.name}
                         </div>
                       </div>
@@ -210,6 +228,20 @@ export default function CreateAuction() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+                  Max Teams
+                </label>
+                <input
+                  type="number"
+                  min={2}
+                  max={10}
+                  value={maxTeams}
+                  onChange={(e) => setMaxTeams(Number(e.target.value))}
+                  className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
                   Bid Countdown Timer
                 </label>
                 <div className="flex gap-2">
@@ -235,7 +267,34 @@ export default function CreateAuction() {
                   </button>
                 </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isPrivate}
+                    onChange={(e) => setIsPrivate(e.target.checked)}
+                    className="w-4 h-4 accent-[#B6FF3B] border-[rgba(255,255,255,0.2)] bg-[#181B21]"
+                  />
+                  Private Room
+                </label>
+              </div>
             </div>
+
+            {isPrivate && (
+              <div className="p-4 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+                  Room Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Set a password for private room"
+                  className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                />
+              </div>
+            )}
 
             {/* AI Toggle */}
             <div className="p-4 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl flex items-center justify-between">
@@ -294,6 +353,25 @@ export default function CreateAuction() {
               <div>
                 <span className="text-xs text-[#A3A7B0]">TIMER</span>
                 <p className="font-bold text-sm">{isUnlimitedTimer ? 'Unlimited' : `${bidTimerSeconds}s`}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl">
+              <div>
+                <span className="text-xs text-[#A3A7B0]">MAX TEAMS</span>
+                <p className="font-bold text-sm">{maxTeams}</p>
+              </div>
+              <div>
+                <span className="text-xs text-[#A3A7B0]">PRIVATE</span>
+                <p className="font-bold text-sm">{isPrivate ? 'Yes' : 'No'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-[#A3A7B0]">AI TEAMS</span>
+                <p className="font-bold text-sm">{aiEnabled ? 'Enabled' : 'Disabled'}</p>
+              </div>
+              <div>
+                <span className="text-xs text-[#A3A7B0]">AI DIFFICULTY</span>
+                <p className="font-bold text-sm">{aiEnabled ? aiDifficulty : 'N/A'}</p>
               </div>
             </div>
 

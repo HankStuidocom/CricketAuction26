@@ -71,3 +71,39 @@ export const ROLE_SHORT: Record<string, string> = {
   'All-Rounder':   'AR',
   'Wicket-Keeper': 'WK',
 };
+
+/** Get persistent authenticated user ID or stable guest ID */
+export function getOrCreateUserId(): string {
+  try {
+    const userStr = localStorage.getItem('ca26_user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user?.id) return user.id;
+    }
+    let guestId = localStorage.getItem('ca26_guest_id');
+    if (!guestId) {
+      guestId = 'guest-' + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('ca26_guest_id', guestId);
+    }
+    return guestId;
+  } catch {
+    return 'guest-' + Math.random().toString(36).substring(2, 10);
+  }
+}
+
+/** Save room session to prevent losing franchise/identity on page refresh */
+export function saveRoomSession(roomCode: string, data: { franchise: string; displayName: string; userId: string; password?: string }) {
+  try {
+    sessionStorage.setItem(`ca26_room_${roomCode.toUpperCase()}`, JSON.stringify(data));
+  } catch {}
+}
+
+/** Retrieve saved room session */
+export function getRoomSession(roomCode: string): { franchise?: string; displayName?: string; userId?: string; password?: string } {
+  try {
+    return JSON.parse(sessionStorage.getItem(`ca26_room_${roomCode.toUpperCase()}`) || '{}');
+  } catch {
+    return {};
+  }
+}
+

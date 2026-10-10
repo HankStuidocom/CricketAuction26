@@ -131,6 +131,17 @@ async function runTests() {
   const unsoldQueue = db.prepare('SELECT status FROM auction_queue WHERE room_id = ? AND queue_position = 1').get(roomId) as any;
   assert(unsoldQueue?.status === 'UNSOLD', 'Player marked UNSOLD when timer expires with no bids');
 
+  // 8. Test AI Bidding Engine
+  const { initializeAITeams, processAIBids } = require('../services/aiBidding');
+  initializeAITeams(roomId, roomCode, { ai_enabled: true, ai_difficulty: 'MEDIUM', max_teams: 10, starting_purse_lakhs: startingPurse });
+  const aiList = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND is_ai = 1').all(roomId);
+  assert(aiList.length === 8, 'AI Initialization: 8 AI teams populated to reach 10 max teams');
+
+  advanceToNextPlayer(roomId);
+  const aiBidPlaced = processAIBids(roomCode);
+  const roomAfterAIBid = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as any;
+  assert(aiBidPlaced && roomAfterAIBid.current_bidder_franchise !== null, 'AI Bidding: AI bot successfully evaluated and placed valid bid');
+
   console.log(`\n=== TEST SUITE COMPLETE: ${passed} PASSED, ${failed} FAILED ===`);
   if (failed > 0) process.exit(1);
 }

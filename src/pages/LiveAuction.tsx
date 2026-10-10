@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuction } from '../hooks/useAuction';
-import { formatCr, ALL_FRANCHISES, FRANCHISE_MAP, ROLE_COLORS, ROLE_SHORT, getNextBid } from '../lib/utils';
-import { safeFetch } from '../lib/api';
+import { formatCr, ALL_FRANCHISES, FRANCHISE_MAP, ROLE_COLORS, ROLE_SHORT, getNextBid, getOrCreateUserId, getRoomSession } from '../lib/utils';
 import { 
   Pause, Play, SkipForward, X, Gavel, Undo2, LogOut, 
   Users, ChevronUp, ChevronDown, MessageSquare, AlertCircle, 
-  Flame, Award, Shield, Sparkles
+  Flame, Award, Shield, Sparkles, Crown, UserCheck
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
 
@@ -15,15 +14,16 @@ export default function LiveAuction() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const myFranchise = location.state?.franchise || 'CSK';
-  const myDisplayName = location.state?.displayName || 'Player';
+  const savedSession = getRoomSession(code || '');
+  const myFranchise = location.state?.franchise || savedSession.franchise || 'CSK';
+  const myDisplayName = location.state?.displayName || savedSession.displayName || 'Player';
+  const myUserId = location.state?.userId || savedSession.userId || getOrCreateUserId();
 
-  const { roomState, error, connected, chatMessages, placeBid, hostAction, sendChat } = useAuction(code || '', myFranchise);
+  const { roomState, error, connected, chatMessages, placeBid, hostAction, sendChat } = useAuction(code || '', myFranchise, myUserId);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [activeTab, setActiveTab] = useState<'info' | 'teams' | 'chat'>('teams');
   const [chatInput, setChatInput] = useState('');
-  const [roomInfo, setRoomInfo] = useState<any>(null);
   const [activePlayerDetails, setActivePlayerDetails] = useState<any>(null);
 
   // Sync deadline timer
@@ -42,33 +42,12 @@ export default function LiveAuction() {
     }
   }, [roomState?.bid_deadline]);
 
-  // Load player details from backend when current_player_id changes
+  // Use current_player from roomState (already enriched)
   useEffect(() => {
-    if (roomState?.current_player_id) {
-      safeFetch(`/api/admin/players/${roomState.current_player_id}`)
-        .then(player => {
-          if (player) setActivePlayerDetails(player);
-        })
-        .catch(() => {
-          // Fallback if needed
-          safeFetch('/api/admin/players')
-            .then(players => {
-              const found = Array.isArray(players) && players.find((p: any) => p.id === roomState.current_player_id);
-              if (found) setActivePlayerDetails(found);
-            })
-            .catch(() => {});
-        });
+    if (roomState?.current_player) {
+      setActivePlayerDetails(roomState.current_player);
     }
-  }, [roomState?.current_player_id]);
-
-  // Load room details
-  useEffect(() => {
-    if (code) {
-      safeFetch(`/api/rooms/${code}`)
-        .then(data => setRoomInfo(data))
-        .catch(() => {});
-    }
-  }, [code]);
+  }, [roomState?.current_player]);
 
   // Redirect on completion
   useEffect(() => {
@@ -81,6 +60,7 @@ export default function LiveAuction() {
   const currentBidder = roomState?.current_bidder_franchise;
   const isHighestBidder = currentBidder === myFranchise;
   const isPaused = roomState?.status === 'PAUSED';
+  const isHost = roomState?.host_id === myUserId;
 
   // Calculate next bid
   const nextBidAmount = currentBid === 0 
@@ -101,6 +81,9 @@ export default function LiveAuction() {
 
   const teamColor = FRANCHISE_MAP[myFranchise]?.primary || '#B6FF3B';
 
+  // Get my participant data from roomState
+  const myParticipant = roomState?.participants?.find((p: any) => p.franchise_id === myFranchise);
+
   return (
     <div className="min-h-screen bg-[#08090C] text-[#F5F5F5] flex flex-col md:flex-row pitch-bg">
       {/* Main Auction Stage (Left / Center) */}
@@ -112,9 +95,14 @@ export default function LiveAuction() {
             <div>
               <div className="text-xs font-bold text-[#A3A7B0] uppercase tracking-wider">ROOM #{code}</div>
               <div className="font-extrabold text-sm sm:text-base flex items-center gap-1.5">
+                {FRANCHISE_MAP[myFranchise]?.logoUrl && (
+                  <img src={FRANCHISE_MAP[myFranchise].logoUrl} alt={myFranchise} className="w-5 h-5 object-contain drop-shadow" />
+                )}
                 <span>{myFranchise}</span>
                 <span className="text-[#A3A7B0]">·</span>
                 <span className="text-xs font-medium text-[#A3A7B0]">{myDisplayName}</span>
+                {isHost && <Crown size={14} className="text-[#F5C542]" />}
+                {myParticipant?.is_ai && <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[9px] font-bold rounded">AI</span>}
               </div>
             </div>
           </div>
@@ -203,7 +191,13 @@ export default function LiveAuction() {
               {currentBidder && (
                 <div className="mt-3 py-2 px-3 bg-[#181B21] rounded-xl text-center text-xs font-bold flex items-center justify-center gap-2 text-[#F5F5F5]">
                   <span>Highest Bidder:</span>
+                  {FRANCHISE_MAP[currentBidder]?.logoUrl && (
+                    <img src={FRANCHISE_MAP[currentBidder].logoUrl} alt={currentBidder} className="w-5 h-5 object-contain drop-shadow" />
+                  )}
                   <span className="text-[#B6FF3B] font-black">{currentBidder}</span>
+                  {currentBidder === myFranchise && (
+                    <UserCheck size={14} className="text-[#B6FF3B]" />
+                  )}
                 </div>
               )}
             </div>
@@ -236,51 +230,68 @@ export default function LiveAuction() {
               </span>
             )}
           </button>
+          
+          {/* My Purse Display */}
+          {myParticipant && (
+            <div className="mt-3 p-3 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl text-center">
+              <div className="text-[10px] text-[#A3A7B0] font-bold uppercase tracking-wider">YOUR PURSE</div>
+              <div className="text-lg font-black text-[#B6FF3B] font-mono mt-1">{formatCr(myParticipant.purse_remaining_lakhs)}</div>
+              <div className="text-[10px] text-[#A3A7B0] mt-1">Squad: {myParticipant.squad_count || 0} / {roomState?.max_squad_size || 10}</div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Side Management Deck (Desktop / Mobile Tabs) */}
       <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-[rgba(255,255,255,0.08)] bg-[#111318] p-4 flex flex-col justify-between">
         <div>
-          {/* Host Control Deck */}
-          <div className="mb-6">
-            <div className="text-xs font-bold text-[#A3A7B0] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Gavel size={14} /> AUCTIONEER COMMANDS
+          {/* Host Control Deck - Only visible to host */}
+          {isHost && (
+            <div className="mb-6">
+              <div className="text-xs font-bold text-[#A3A7B0] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Gavel size={14} /> AUCTIONEER COMMANDS
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  onClick={() => hostAction(isPaused ? 'resume' : 'pause')}
+                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)]"
+                >
+                  {isPaused ? <Play size={16} className="text-[#B6FF3B]" /> : <Pause size={16} />}
+                  <span>{isPaused ? 'Resume' : 'Pause'}</span>
+                </button>
+
+                <button
+                  onClick={() => hostAction('skip')}
+                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)]"
+                >
+                  <SkipForward size={16} />
+                  <span>Skip</span>
+                </button>
+
+                <button
+                  onClick={() => hostAction('mark_unsold')}
+                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)] text-red-400"
+                >
+                  <X size={16} />
+                  <span>Unsold</span>
+                </button>
+
+                <button
+                  onClick={() => navigate(`/room/${code}/results`)}
+                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)] text-[#F5C542]"
+                >
+                  <Award size={16} />
+                  <span>Results</span>
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              <button
-                onClick={() => hostAction(isPaused ? 'resume' : 'pause')}
-                className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)]"
-              >
-                {isPaused ? <Play size={16} className="text-[#B6FF3B]" /> : <Pause size={16} />}
-                <span>{isPaused ? 'Resume' : 'Pause'}</span>
-              </button>
+          )}
 
-              <button
-                onClick={() => hostAction('skip')}
-                className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)]"
-              >
-                <SkipForward size={16} />
-                <span>Skip</span>
-              </button>
-
-              <button
-                onClick={() => hostAction('mark_unsold')}
-                className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)] text-red-400"
-              >
-                <X size={16} />
-                <span>Unsold</span>
-              </button>
-
-              <button
-                onClick={() => navigate(`/room/${code}/results`)}
-                className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)] text-[#F5C542]"
-              >
-                <Award size={16} />
-                <span>Results</span>
-              </button>
+          {!isHost && (
+            <div className="mb-6 p-3 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl text-center text-xs text-[#A3A7B0]">
+              Host controls visible to auctioneer only
             </div>
-          </div>
+          )}
 
           {/* Navigation Tabs for Right Panel */}
           <div className="flex border-b border-[rgba(255,255,255,0.08)] mb-4 text-xs font-bold">
@@ -298,30 +309,53 @@ export default function LiveAuction() {
             </button>
           </div>
 
-          {/* Tab 1: Teams Overview */}
+          {/* Tab 1: Teams Overview - Using real-time data from roomState */}
           {activeTab === 'teams' && (
             <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-              {ALL_FRANCHISES.map(f => (
-                <div key={f.id} className="p-3 bg-[#181B21] rounded-xl border border-[rgba(255,255,255,0.04)] flex justify-between items-center">
-                  <div className="flex items-center gap-2.5">
-                    {f.logoUrl ? (
-                      <img src={f.logoUrl} alt={f.id} className="w-6 h-6 object-contain" />
-                    ) : (
-                      <span className="text-base">{f.emoji}</span>
-                    )}
-                    <div>
-                      <div className="font-extrabold text-xs" style={{ color: f.primary }}>{f.name}</div>
-                      <div className="text-[10px] text-[#A3A7B0]">Max: {roomInfo?.max_squad_size || 10} players</div>
+              {ALL_FRANCHISES.map(f => {
+                const participant = roomState?.participants?.find((p: any) => p.franchise_id === f.id);
+                const isMyTeam = participant?.franchise_id === myFranchise;
+                
+                return (
+                  <div key={f.id} className={`p-3 bg-[#181B21] rounded-xl border flex justify-between items-center ${
+                    isMyTeam ? 'border-[#B6FF3B]/30' : 'border-[rgba(255,255,255,0.04)]'
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      {f.logoUrl ? (
+                        <img src={f.logoUrl} alt={f.id} className="w-12 h-12 object-contain drop-shadow-sm" />
+                      ) : (
+                        <span className="text-base">{f.emoji}</span>
+                      )}
+                      <div>
+                        <div className="font-extrabold text-xs" style={{ color: f.primary }}>{f.name}</div>
+                        {participant && (
+                          <>
+                            <div className="text-[10px] text-[#A3A7B0]">
+                              {participant.is_ai ? '🤖 AI' : '👤 Human'} · Squad: {participant.squad_count || 0} / {roomState?.max_squad_size || 10}
+                            </div>
+                            {participant.is_host && <div className="text-[10px] text-[#F5C542] font-bold">HOST</div>}
+                          </>
+                        )}
+                        {!participant && (
+                          <div className="text-[10px] text-[#A3A7B0]">Open Slot</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {participant ? (
+                        <div className="font-mono text-xs font-bold text-[#B6FF3B]">
+                          {formatCr(participant.purse_remaining_lakhs)}
+                        </div>
+                      ) : (
+                        <div className="font-mono text-xs font-bold text-[#F5F5F5]">
+                          {formatCr(roomState?.starting_purse_lakhs || 12000)}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-[#A3A7B0]">Purse</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-mono text-xs font-bold text-[#F5F5F5]">
-                      {formatCr(roomInfo?.starting_purse_lakhs || 12000)}
-                    </div>
-                    <div className="text-[10px] text-[#A3A7B0]">Purse</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

@@ -5,3 +5,6 @@ dist
 server/data/*.db*
 !server/data/.gitkeep
 CricketAuction26. Main File
+
+.vercel
+.env*
