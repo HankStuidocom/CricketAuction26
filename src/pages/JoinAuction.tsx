@@ -104,7 +104,13 @@ export default function JoinAuction() {
                       : 'border-[rgba(255,255,255,0.08)] bg-[#111318] text-[#A3A7B0] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
-                  <div>{f.emoji}</div>
+                  <div className="h-7 flex items-center justify-center mb-1">
+                    {f.logoUrl ? (
+                      <img src={f.logoUrl} alt={f.id} className="max-h-full max-w-full object-contain" />
+                    ) : (
+                      <span>{f.emoji}</span>
+                    )}
+                  </div>
                   <div>{f.id}</div>
                 </button>
               ))}

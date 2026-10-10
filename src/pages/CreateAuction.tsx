@@ -131,7 +131,11 @@ export default function CreateAuction() {
                       }`}
                     >
                       <div className="flex justify-between items-start">
-                        <span className="text-2xl">{team.emoji}</span>
+                        {team.logoUrl ? (
+                          <img src={team.logoUrl} alt={team.id} className="w-10 h-10 object-contain drop-shadow-md" />
+                        ) : (
+                          <span className="text-2xl">{team.emoji}</span>
+                        )}
                         {isSelected && <CheckCircle2 size={18} className="text-[#B6FF3B]" />}
                       </div>
                       <div>

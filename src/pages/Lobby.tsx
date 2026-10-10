@@ -153,7 +153,11 @@ export default function Lobby() {
                 style={{ borderTop: `4px solid ${team.primary}` }}
               >
                 <div className="flex justify-between items-start">
-                  <div className="text-xl">{team.emoji}</div>
+                  {team.logoUrl ? (
+                    <img src={team.logoUrl} alt={team.id} className="w-8 h-8 object-contain drop-shadow" />
+                  ) : (
+                    <div className="text-xl">{team.emoji}</div>
+                  )}
                   {isMyTeam && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-[#B6FF3B] text-black">
                       YOU

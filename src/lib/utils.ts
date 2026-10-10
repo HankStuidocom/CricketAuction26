@@ -36,16 +36,16 @@ export function generatePlayerId(): string {
 }
 
 export const ALL_FRANCHISES: Franchise[] = [
-  { id: 'CSK',  name: 'Chennai Super Kings',          primary: '#F9CD05', secondary: '#124CA0', emoji: '🦁', tagline: 'Whistle Podu' },
-  { id: 'MI',   name: 'Mumbai Indians',                primary: '#004BA0', secondary: '#D1AB3E', emoji: '🌊', tagline: 'One Family' },
-  { id: 'KKR',  name: 'Kolkata Knight Riders',         primary: '#3A225D', secondary: '#ECC542', emoji: '⚔️',  tagline: 'Korbo Lorbo Jeetbo' },
-  { id: 'RCB',  name: 'Royal Challengers Bengaluru',   primary: '#EC1C24', secondary: '#000000', emoji: '👑', tagline: 'Play Bold' },
-  { id: 'DC',   name: 'Delhi Capitals',                primary: '#17479E', secondary: '#D71920', emoji: '⚡', tagline: 'Roar Macha' },
-  { id: 'PBKS', name: 'Punjab Kings',                  primary: '#D71920', secondary: '#A7A8AA', emoji: '🦁', tagline: 'Sadda Punjab' },
-  { id: 'RR',   name: 'Rajasthan Royals',              primary: '#254AA5', secondary: '#F26522', emoji: '👑', tagline: 'Halla Bol' },
-  { id: 'SRH',  name: 'Sunrisers Hyderabad',           primary: '#F26522', secondary: '#000000', emoji: '🌅', tagline: 'Orange Army' },
-  { id: 'GT',   name: 'Gujarat Titans',                primary: '#1C2B3A', secondary: '#CCA34C', emoji: '⚡', tagline: 'Aava De' },
-  { id: 'LSG',  name: 'Lucknow Super Giants',          primary: '#003E7E', secondary: '#66D2EA', emoji: '🔥', tagline: 'Gazab Andaz' },
+  { id: 'CSK',  name: 'Chennai Super Kings',          primary: '#F9CD05', secondary: '#124CA0', emoji: '🦁', logoUrl: '/teams/CSK.png', tagline: 'Whistle Podu' },
+  { id: 'MI',   name: 'Mumbai Indians',                primary: '#004BA0', secondary: '#D1AB3E', emoji: '🌊', logoUrl: '/teams/MI.png', tagline: 'One Family' },
+  { id: 'KKR',  name: 'Kolkata Knight Riders',         primary: '#3A225D', secondary: '#ECC542', emoji: '⚔️',  logoUrl: '/teams/KKR.png', tagline: 'Korbo Lorbo Jeetbo' },
+  { id: 'RCB',  name: 'Royal Challengers Bengaluru',   primary: '#EC1C24', secondary: '#000000', emoji: '👑', logoUrl: '/teams/RCB.png', tagline: 'Play Bold' },
+  { id: 'DC',   name: 'Delhi Capitals',                primary: '#17479E', secondary: '#D71920', emoji: '⚡', logoUrl: '/teams/DC.png', tagline: 'Roar Macha' },
+  { id: 'PBKS', name: 'Punjab Kings',                  primary: '#D71920', secondary: '#A7A8AA', emoji: '🦁', logoUrl: '/teams/PBKS.png', tagline: 'Sadda Punjab' },
+  { id: 'RR',   name: 'Rajasthan Royals',              primary: '#254AA5', secondary: '#F26522', emoji: '👑', logoUrl: '/teams/RR.png', tagline: 'Halla Bol' },
+  { id: 'SRH',  name: 'Sunrisers Hyderabad',           primary: '#F26522', secondary: '#000000', emoji: '🌅', logoUrl: '/teams/SRH.png', tagline: 'Orange Army' },
+  { id: 'GT',   name: 'Gujarat Titans',                primary: '#1C2B3A', secondary: '#CCA34C', emoji: '⚡', logoUrl: '/teams/GT.png', tagline: 'Aava De' },
+  { id: 'LSG',  name: 'Lucknow Super Giants',          primary: '#003E7E', secondary: '#66D2EA', emoji: '🔥', logoUrl: '/teams/LSG.png', tagline: 'Gazab Andaz' },
 ];
 
 export const FRANCHISE_MAP = Object.fromEntries(ALL_FRANCHISES.map(f => [f.id, f]));

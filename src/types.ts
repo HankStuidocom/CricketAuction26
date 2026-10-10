@@ -25,6 +25,7 @@ export interface Franchise {
   primary: string;   // CSS color
   secondary: string;
   emoji: string;
+  logoUrl?: string;
   tagline: string;
 }
 

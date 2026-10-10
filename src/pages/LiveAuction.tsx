@@ -304,7 +304,11 @@ export default function LiveAuction() {
               {ALL_FRANCHISES.map(f => (
                 <div key={f.id} className="p-3 bg-[#181B21] rounded-xl border border-[rgba(255,255,255,0.04)] flex justify-between items-center">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-base">{f.emoji}</span>
+                    {f.logoUrl ? (
+                      <img src={f.logoUrl} alt={f.id} className="w-6 h-6 object-contain" />
+                    ) : (
+                      <span className="text-base">{f.emoji}</span>
+                    )}
                     <div>
                       <div className="font-extrabold text-xs" style={{ color: f.primary }}>{f.name}</div>
                       <div className="text-[10px] text-[#A3A7B0]">Max: {roomInfo?.max_squad_size || 10} players</div>
