@@ -1,14 +1,14 @@
 services:
+  # Backend Realtime Node.js + Socket.IO Service
   - type: web
-    name: cricket-auction-26-server
+    name: cricket-auction-backend
     env: node
-    plan: free
     rootDir: server
-    buildCommand: npm install && npm run build
-    startCommand: node dist/index.js
-    healthCheckPath: /health
+    buildCommand: npm install
+    startCommand: npx tsx src/index.ts
+    plan: free
     envVars:
       - key: PORT
-        value: 10000
+        value: 3001
       - key: NODE_ENV
         value: production

@@ -1,203 +1,77 @@
-import 'dotenv/config';
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import { initializeDatabase } from './database/schema';
+import { importPlayersFromExcel } from './services/importPlayers';
+import { setupSocketHandlers } from './socket/roomHandlers';
+import db from './database/db';
 
-import { Room } from './types';
-import { PLAYERS, getShuffledPlayerPool } from './data/players';
-import { IPL_TEAMS } from './data/iplTeams';
-import { AuctionEngine } from './engine/auctionEngine';
-import { registerRoomHandlers, sanitizeRoom } from './socket/roomHandlers';
-import { registerAuctionHandlers } from './socket/auctionHandlers';
-
-// ─────────────────────────────────────────────────────────────
-//  Config
-// ─────────────────────────────────────────────────────────────
-
-const PORT = parseInt(process.env.PORT ?? '3001', 10);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
-
-// ─────────────────────────────────────────────────────────────
-//  Express Setup
-// ─────────────────────────────────────────────────────────────
+import authRoutes from './routes/auth';
+import roomRoutes from './routes/rooms';
+import adminRoutes from './routes/admin';
 
 const app = express();
-
-app.use(
-  cors({
-    origin: (origin, callback) => callback(null, true),
-    credentials: true,
-  })
-);
-app.use(express.json());
-
-// ── Health check endpoint ────────────────────────────────────
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    service: 'cricket-auction-26-server',
-    timestamp: new Date().toISOString(),
-    activeRooms: rooms.size,
-  });
-});
-
-// ── Room info endpoint (debug/lobby listing) ─────────────────
-app.get('/api/rooms', (_req: Request, res: Response) => {
-  const roomList = [...rooms.values()].map((r) => ({
-    code: r.code,
-    status: r.status,
-    teamCount: r.teams.length,
-    createdAt: r.createdAt,
-  }));
-  res.json(roomList);
-});
-
-// ── Single Room info endpoint ─────────────────────────────────
-app.get('/api/rooms/:code', (req: Request, res: Response) => {
-  const code = (req.params.code || '').toUpperCase();
-  const room = rooms.get(code);
-  if (!room) {
-    return res.status(404).json({ error: 'Room not found' });
-  }
-  res.json({ room: sanitizeRoom(room) });
-});
-
-// ── Room creation REST endpoint ───────────────────────────────
-app.post('/api/rooms/create', (req: Request, res: Response) => {
-  try {
-    const { teamId, iplTeamId, managerName, settings } = req.body || {};
-    const selectedIplTeamId = iplTeamId || teamId;
-    const iplTeam = IPL_TEAMS.find((t) => t.id === selectedIplTeamId);
-    if (!iplTeam) {
-      return res.status(400).json({ error: 'Invalid IPL team' });
-    }
-
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code: string;
-    do {
-      code = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    } while (rooms.has(code));
-
-    const defaultSettings = {
-      startingPurse: 8000,
-      auctionTimer: 15,
-      playerPoolSize: 60,
-      minSquadSize: 2,
-      maxSquadSize: 10,
-      aiDifficulty: 'medium' as const,
-    };
-
-    const mergedSettings = { ...defaultSettings, ...settings };
-
-    const hostTeam = {
-      id: `rest_${Date.now()}`,
-      iplTeamId: selectedIplTeamId,
-      managerName: managerName || 'Manager',
-      purse: mergedSettings.startingPurse,
-      players: [],
-      isAI: false,
-      aiPersonality: null,
-      isReady: false,
-      isCaptainSet: false,
-      captainId: null,
-      viceCaptainId: null,
-    };
-
-    const room: Room = {
-      code,
-      hostId: hostTeam.id,
-      teams: [hostTeam],
-      status: 'lobby',
-      settings: mergedSettings,
-      currentAuction: null,
-      playerPool: getShuffledPlayerPool(mergedSettings.playerPoolSize),
-      createdAt: new Date(),
-    };
-
-    rooms.set(code, room);
-    res.json({ success: true, room: sanitizeRoom(room) });
-  } catch (err) {
-    res.status(500).json({ error: 'Internal error creating room' });
-  }
-});
-
-// ── Players database endpoint ───────────────────────────────
-app.get('/api/players', (_req: Request, res: Response) => {
-  res.json(PLAYERS);
-});
-
-// ─────────────────────────────────────────────────────────────
-//  HTTP + Socket.io Server
-// ─────────────────────────────────────────────────────────────
-
 const httpServer = createServer(app);
 
+const corsOptions = {
+  origin: '*', // Allow all origins for flexibility between local dev and Vercel/Render
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 const io = new Server(httpServer, {
-  cors: {
-    origin: (origin, callback) => callback(null, true),
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
-  pingTimeout: 30000,
-  pingInterval: 10000,
+  cors: corsOptions
 });
 
-// ─────────────────────────────────────────────────────────────
-//  In-memory store
-// ─────────────────────────────────────────────────────────────
+app.use(cors(corsOptions));
+app.use(express.json());
 
-const rooms = new Map<string, Room>();
-
-// ─────────────────────────────────────────────────────────────
-//  Auction Engine
-// ─────────────────────────────────────────────────────────────
-
-const auctionEngine = new AuctionEngine(io);
-
-// ─────────────────────────────────────────────────────────────
-//  Socket.io Connection Handler
-// ─────────────────────────────────────────────────────────────
-
-io.on('connection', (socket) => {
-  console.log(`[Socket] Connected: ${socket.id}`);
-
-  registerRoomHandlers(io, socket, rooms);
-  registerAuctionHandlers(io, socket, rooms, auctionEngine);
-
-  socket.on('disconnect', (reason) => {
-    console.log(`[Socket] Disconnected: ${socket.id} (${reason})`);
-  });
-
-  socket.on('error', (err) => {
-    console.error(`[Socket] Error on ${socket.id}:`, err);
-  });
+// Health Check Endpoint
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', timestamp: Date.now() });
 });
 
-// ─────────────────────────────────────────────────────────────
-//  Room cleanup: remove stale rooms older than 6 hours
-// ─────────────────────────────────────────────────────────────
+async function startServer() {
+  // Init DB
+  await db.init();
+  initializeDatabase();
 
-setInterval(() => {
-  const SIX_HOURS = 6 * 60 * 60 * 1000;
-  const now = Date.now();
-  for (const [code, room] of rooms.entries()) {
-    if (now - room.createdAt.getTime() > SIX_HOURS) {
-      rooms.delete(code);
-      console.log(`[Cleanup] Removed stale room: ${code}`);
-    }
+  // Import on first run
+  const playersCount = db.prepare('SELECT COUNT(*) as count FROM players').get() as { count: number };
+  if (!playersCount || playersCount.count === 0) {
+    console.log('No players found. Importing from Excel...');
+    const result = importPlayersFromExcel();
+    console.log('Import result:', result);
   }
-}, 60 * 60 * 1000); // run every hour
 
-// ─────────────────────────────────────────────────────────────
-//  Start
-// ─────────────────────────────────────────────────────────────
+  // Setup routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/rooms', roomRoutes);
+  app.use('/api/admin', adminRoutes);
 
-httpServer.listen(PORT, () => {
-  console.log(`\n🏏  Cricket Auction 26 Server`);
-  console.log(`    Listening on http://localhost:${PORT}`);
-  console.log(`    Health: http://localhost:${PORT}/health`);
-  console.log(`    Client origin: ${CLIENT_ORIGIN}\n`);
+  // Catch-all API 404 Handler (Guarantees JSON instead of HTML error pages)
+  app.use('/api/*', (req: Request, res: Response) => {
+    res.status(404).json({ error: `API route '${req.originalUrl}' not found` });
+  });
+
+  // Global Error Handler Middleware for API (Guarantees JSON instead of HTML stack traces)
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('API Error:', err);
+    res.status(err.status || 500).json({
+      error: err.message || 'Internal Server Error'
+    });
+  });
+
+  // Setup socket
+  setupSocketHandlers(io);
+
+  const PORT = process.env.PORT || 3001;
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer().catch(err => {
+  console.error('Failed to start server:', err);
 });
-
-export { io, rooms };

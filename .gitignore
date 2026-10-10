@@ -1,24 +1,7 @@
-# Dependency directories
-node_modules/
-
-# Output / Build directories
-dist/
-build/
-.next/
-out/
-
-# Vercel build output
-.vercel/
-
-# Environment variables
+node_modules
+dist
 .env
-*.env
-!server/.env.example
-
-# OS & Editor files
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-
-.vercel
+*.local
+server/data/*.db*
+!server/data/.gitkeep
+CricketAuction26. Main File
