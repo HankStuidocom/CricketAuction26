@@ -9,10 +9,11 @@ export function setupSocketHandlers(io: Server) {
     
     socket.on('join_room', (data) => {
       const { roomCode, userId, franchise, displayName, password } = data;
-      const room = db.prepare('SELECT * FROM rooms WHERE room_code = ?').get(roomCode) as unknown as Room | undefined;
+      const normalizedCode = (roomCode || '').trim().toUpperCase();
+      const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return socket.emit('error', { message: 'Room not found' });
       
-      socket.join(roomCode);
+      socket.join(normalizedCode);
       
       let p = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise);
       

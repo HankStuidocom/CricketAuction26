@@ -64,13 +64,19 @@ export default function Lobby() {
     };
   }, [code]);
 
-  const fetchRoomDetails = async () => {
+  const fetchRoomDetails = async (retries = 3) => {
     if (!code) return;
     try {
-      const data = await safeFetch(`/api/rooms/${code}`);
+      const cleanCode = code.trim().toUpperCase();
+      const data = await safeFetch(`/api/rooms/${cleanCode}`);
       setRoom(data);
+      setError(null);
     } catch (err: any) {
-      setError(err.message);
+      if (retries > 0) {
+        setTimeout(() => fetchRoomDetails(retries - 1), 1000);
+      } else {
+        setError(err.message);
+      }
     }
   };
 

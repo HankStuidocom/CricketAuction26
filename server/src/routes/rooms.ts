@@ -66,7 +66,8 @@ router.post('/', (req, res) => {
 // Room info
 router.get('/:code', (req, res) => {
   try {
-    const room = db.prepare('SELECT * FROM rooms WHERE room_code = ?').get(req.params.code);
+    const code = (req.params.code || '').trim().toUpperCase();
+    const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(code);
     if (!room) return res.status(404).json({ error: 'Room not found' });
     res.json(room);
   } catch (err: any) {
