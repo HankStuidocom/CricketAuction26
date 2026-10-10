@@ -176,57 +176,59 @@ export default function Home() {
       )}
 
       {/* Main Container - App Shell */}
-      <div className="max-w-md md:max-w-xl mx-auto min-h-screen relative flex flex-col justify-between pb-28 px-4 pt-3">
+      <div className="max-w-md md:max-w-xl mx-auto min-h-screen relative flex flex-col pb-28 px-4 pt-3">
         
-        {/* Top Header */}
-        <header className="flex justify-between items-center py-3 mb-2">
-          {/* Brand Logo & Mark */}
-          <div 
-            onClick={() => setActiveTab('home')}
-            className="flex items-center gap-2.5 cursor-pointer"
-          >
-            <i className="brand-mark"></i>
-            <div>
-              <span className="font-extrabold text-xl tracking-tight font-['Manrope'] leading-none block">
-                Crick<span className="text-[#D9FF4D]">Auction</span>
-              </span>
-              <span className="text-[9px] font-bold tracking-widest text-[#8993A8] uppercase block mt-0.5">
-                IPL 2026 EDITION
-              </span>
+        {/* Top Header - Only on Home tab (matches index.html) */}
+        {activeTab === 'home' && (
+          <header className="flex justify-between items-center py-3 mb-2">
+            {/* Brand Logo & Mark */}
+            <div 
+              onClick={() => setActiveTab('home')}
+              className="flex items-center gap-2.5 cursor-pointer"
+            >
+              <i className="brand-mark"></i>
+              <div>
+                <span className="font-extrabold text-xl tracking-tight font-['Manrope'] leading-none block">
+                  Crick<span className="text-[#D9FF4D]">Auction</span>
+                </span>
+                <span className="text-[9px] font-bold tracking-widest text-[#8993A8] uppercase block mt-0.5">
+                  IPL 2026 EDITION
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Quick Header Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab('matches')}
-              className="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-[#8993A8] hover:text-white relative"
-              title="Search Matches"
-            >
-              <Search size={18} />
-              {publicRooms.length > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF344C] animate-pulse"></span>
-              )}
-            </button>
+            {/* Quick Header Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveTab('matches')}
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-[#8993A8] hover:text-white relative"
+                title="Search Matches"
+              >
+                <Search size={18} />
+                {publicRooms.length > 0 && (
+                  <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF344C] animate-pulse"></span>
+                )}
+              </button>
 
-            <button
-              onClick={() => setActiveTab('friends')}
-              className="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-[#8993A8] hover:text-white relative"
-              title="Friends & Crew"
-            >
-              <Users size={18} />
-              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF344C]"></span>
-            </button>
+              <button
+                onClick={() => setActiveTab('friends')}
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-[#8993A8] hover:text-white relative"
+                title="Friends & Crew"
+              >
+                <Users size={18} />
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#FF344C]"></span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('profile')}
-              className="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-[#8993A8] hover:text-white"
-              title="Profile"
-            >
-              <User size={18} />
-            </button>
-          </div>
-        </header>
+              <button
+                onClick={() => setActiveTab('profile')}
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center text-[#8993A8] hover:text-white"
+                title="Profile"
+              >
+                <User size={18} />
+              </button>
+            </div>
+          </header>
+        )}
 
         {/* ========================================================================= */}
         {/* SCREEN 1: HOME DASHBOARD                                                  */}
