@@ -85,22 +85,22 @@ export default function LiveAuction() {
   const myParticipant = roomState?.participants?.find((p: any) => p.franchise_id === myFranchise);
 
   return (
-    <div className="min-h-screen bg-[#08090C] text-[#F5F5F5] flex flex-col md:flex-row pitch-bg">
+    <div className="min-h-screen bg-gradient-to-b from-[#05172E] via-[#020B18] to-[#020A16] text-[#F5F7FF] flex flex-col md:flex-row font-['DM_Sans',sans-serif]">
       {/* Main Auction Stage (Left / Center) */}
       <div className="flex-1 flex flex-col p-4 sm:p-6 justify-between max-w-4xl mx-auto w-full">
         {/* Top Auction Header */}
-        <div className="flex justify-between items-center bg-[#111318] border border-[rgba(255,255,255,0.08)] px-4 py-3 rounded-2xl mb-4">
+        <div className="flex justify-between items-center bg-[#0B1730] border border-white/10 px-4 py-3 rounded-2xl mb-4">
           <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#B6FF3B] animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#D9FF4D] animate-pulse"></span>
             <div>
-              <div className="text-xs font-bold text-[#A3A7B0] uppercase tracking-wider">ROOM #{code}</div>
-              <div className="font-extrabold text-sm sm:text-base flex items-center gap-1.5">
+              <div className="text-xs font-bold text-[#8993A8] uppercase tracking-wider font-mono">ROOM #{code}</div>
+              <div className="font-extrabold text-sm sm:text-base flex items-center gap-1.5 font-['Manrope']">
                 {FRANCHISE_MAP[myFranchise]?.logoUrl && (
                   <img src={FRANCHISE_MAP[myFranchise].logoUrl} alt={myFranchise} className="w-5 h-5 object-contain drop-shadow" />
                 )}
                 <span>{myFranchise}</span>
-                <span className="text-[#A3A7B0]">·</span>
-                <span className="text-xs font-medium text-[#A3A7B0]">{myDisplayName}</span>
+                <span className="text-[#8993A8]">·</span>
+                <span className="text-xs font-medium text-[#8993A8]">{myDisplayName}</span>
                 {isHost && <Crown size={14} className="text-[#F5C542]" />}
                 {myParticipant?.is_ai && <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[9px] font-bold rounded">AI</span>}
               </div>
@@ -114,8 +114,8 @@ export default function LiveAuction() {
               </span>
             ) : (
               <div className="flex items-center gap-1.5 font-mono">
-                <span className="text-xs text-[#A3A7B0]">TIMER:</span>
-                <span className={`text-xl font-black ${timeLeft <= 3 && timeLeft > 0 ? 'text-red-500 animate-pulse' : 'text-[#B6FF3B]'}`}>
+                <span className="text-xs text-[#8993A8]">TIMER:</span>
+                <span className={`text-xl font-black ${timeLeft <= 3 && timeLeft > 0 ? 'text-red-500 animate-pulse' : 'text-[#D9FF4D]'}`}>
                   {timeLeft > 0 ? `00:${timeLeft < 10 ? '0' : ''}${timeLeft}` : '--'}
                 </span>
               </div>
@@ -133,8 +133,8 @@ export default function LiveAuction() {
         <div className="my-auto py-4 flex flex-col items-center">
           {activePlayerDetails ? (
             <div 
-              className="w-full max-w-md bg-[#111318] border border-[rgba(255,255,255,0.08)] rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden transition-all duration-300"
-              style={{ borderTop: `6px solid ${ROLE_COLORS[activePlayerDetails.primary_role] || '#B6FF3B'}` }}
+              className="w-full max-w-md bg-[#0B1730] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden transition-all duration-300"
+              style={{ borderTop: `6px solid ${ROLE_COLORS[activePlayerDetails.primary_role] || '#D9FF4D'}` }}
             >
               {/* Badges strip */}
               <div className="flex justify-between items-center mb-6">
@@ -202,10 +202,10 @@ export default function LiveAuction() {
               )}
             </div>
           ) : (
-            <div className="w-full max-w-md bg-[#111318] border border-[rgba(255,255,255,0.08)] rounded-3xl p-12 text-center">
-              <div className="animate-spin text-[#B6FF3B] inline-block mb-4">🏏</div>
-              <h3 className="text-xl font-extrabold">Waiting for Next Player...</h3>
-              <p className="text-xs text-[#A3A7B0] mt-1">The auctioneer will call the next cricketer to the stage.</p>
+            <div className="w-full max-w-md bg-[#0B1730] border border-white/10 rounded-3xl p-12 text-center">
+              <div className="animate-spin text-[#D9FF4D] inline-block mb-4 text-2xl">🏏</div>
+              <h3 className="text-xl font-extrabold font-['Manrope'] text-white">Waiting for Next Player...</h3>
+              <p className="text-xs text-[#8993A8] mt-1">The auctioneer will call the next cricketer to the stage.</p>
             </div>
           )}
         </div>
@@ -215,12 +215,12 @@ export default function LiveAuction() {
           <button
             onClick={handlePlaceBid}
             disabled={isHighestBidder || isPaused || !activePlayerDetails}
-            className={`w-full py-5 px-6 rounded-2xl font-black text-lg sm:text-xl tracking-tight transition shadow-2xl flex flex-col items-center justify-center ${
+            className={`w-full py-5 px-6 rounded-2xl font-black text-lg sm:text-xl tracking-tight transition shadow-2xl flex flex-col items-center justify-center font-['Manrope'] ${
               isHighestBidder
-                ? 'bg-[#181B21] text-[#A3A7B0] border border-[rgba(255,255,255,0.08)] cursor-not-allowed'
+                ? 'bg-[#061224] text-[#8993A8] border border-white/10 cursor-not-allowed'
                 : isPaused
-                ? 'bg-[#181B21] text-[#A3A7B0] cursor-not-allowed'
-                : 'bg-[#B6FF3B] hover:bg-[#a3f024] text-black shadow-[0_0_30px_rgba(182,255,59,0.35)] active:scale-95'
+                ? 'bg-[#061224] text-[#8993A8] cursor-not-allowed'
+                : 'bg-[#D9FF4D] hover:bg-[#c7f035] text-[#07111E] shadow-[0_0_30px_rgba(217,255,77,0.35)] active:scale-95'
             }`}
           >
             <span>{isHighestBidder ? 'YOU ARE HIGHEST BIDDER' : `BID ${formatCr(nextBidAmount)}`}</span>
@@ -233,36 +233,36 @@ export default function LiveAuction() {
           
           {/* My Purse Display */}
           {myParticipant && (
-            <div className="mt-3 p-3 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl text-center">
-              <div className="text-[10px] text-[#A3A7B0] font-bold uppercase tracking-wider">YOUR PURSE</div>
-              <div className="text-lg font-black text-[#B6FF3B] font-mono mt-1">{formatCr(myParticipant.purse_remaining_lakhs)}</div>
-              <div className="text-[10px] text-[#A3A7B0] mt-1">Squad: {myParticipant.squad_count || 0} / {roomState?.max_squad_size || 10}</div>
+            <div className="mt-3 p-3 bg-[#061224] border border-white/10 rounded-xl text-center">
+              <div className="text-[10px] text-[#8993A8] font-bold uppercase tracking-wider">YOUR PURSE</div>
+              <div className="text-lg font-black text-[#D9FF4D] font-mono mt-1">{formatCr(myParticipant.purse_remaining_lakhs)}</div>
+              <div className="text-[10px] text-[#8993A8] mt-1">Squad: {myParticipant.squad_count || 0} / {roomState?.max_squad_size || 10}</div>
             </div>
           )}
         </div>
       </div>
 
       {/* Side Management Deck (Desktop / Mobile Tabs) */}
-      <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-[rgba(255,255,255,0.08)] bg-[#111318] p-4 flex flex-col justify-between">
+      <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-white/10 bg-[#0B1730] p-4 flex flex-col justify-between">
         <div>
           {/* Host Control Deck - Only visible to host */}
           {isHost && (
             <div className="mb-6">
-              <div className="text-xs font-bold text-[#A3A7B0] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <div className="text-xs font-bold text-[#8993A8] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Gavel size={14} /> AUCTIONEER COMMANDS
               </div>
               <div className="grid grid-cols-4 gap-2">
                 <button
                   onClick={() => hostAction(isPaused ? 'resume' : 'pause')}
-                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)]"
+                  className="p-2.5 bg-[#061224] hover:bg-[#122247] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-white/10 text-white"
                 >
-                  {isPaused ? <Play size={16} className="text-[#B6FF3B]" /> : <Pause size={16} />}
+                  {isPaused ? <Play size={16} className="text-[#D9FF4D]" /> : <Pause size={16} />}
                   <span>{isPaused ? 'Resume' : 'Pause'}</span>
                 </button>
 
                 <button
                   onClick={() => hostAction('skip')}
-                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)]"
+                  className="p-2.5 bg-[#061224] hover:bg-[#122247] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-white/10 text-white"
                 >
                   <SkipForward size={16} />
                   <span>Skip</span>
@@ -270,7 +270,7 @@ export default function LiveAuction() {
 
                 <button
                   onClick={() => hostAction('mark_unsold')}
-                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)] text-red-400"
+                  className="p-2.5 bg-[#061224] hover:bg-[#122247] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-white/10 text-red-400"
                 >
                   <X size={16} />
                   <span>Unsold</span>
@@ -278,7 +278,7 @@ export default function LiveAuction() {
 
                 <button
                   onClick={() => navigate(`/room/${code}/results`)}
-                  className="p-2.5 bg-[#181B21] hover:bg-[#20242c] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-[rgba(255,255,255,0.08)] text-[#F5C542]"
+                  className="p-2.5 bg-[#061224] hover:bg-[#122247] rounded-xl text-xs font-bold flex flex-col items-center gap-1 border border-white/10 text-[#F5C542]"
                 >
                   <Award size={16} />
                   <span>Results</span>
@@ -288,16 +288,16 @@ export default function LiveAuction() {
           )}
 
           {!isHost && (
-            <div className="mb-6 p-3 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl text-center text-xs text-[#A3A7B0]">
+            <div className="mb-6 p-3 bg-[#061224] border border-white/10 rounded-xl text-center text-xs text-[#8993A8]">
               Host controls visible to auctioneer only
             </div>
           )}
 
           {/* Navigation Tabs for Right Panel */}
-          <div className="flex border-b border-[rgba(255,255,255,0.08)] mb-4 text-xs font-bold">
+          <div className="flex border-b border-white/10 mb-4 text-xs font-bold">
             <button
               onClick={() => setActiveTab('teams')}
-              className={`pb-2 px-3 border-b-2 transition ${activeTab === 'teams' ? 'border-[#B6FF3B] text-[#B6FF3B]' : 'border-transparent text-[#A3A7B0]'}`}
+              className={`pb-2 px-3 border-b-2 transition ${activeTab === 'teams' ? 'border-[#D9FF4D] text-[#D9FF4D]' : 'border-transparent text-[#8993A8]'}`}
             >
               Teams & Purse
             </button>

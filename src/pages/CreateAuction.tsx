@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ALL_FRANCHISES, getOrCreateUserId, saveRoomSession } from '../lib/utils';
 import { safeFetch } from '../lib/api';
-import { Shield, Settings2, CheckCircle2, ChevronRight, ChevronLeft, Lock } from 'lucide-react';
+import { Shield, Settings2, CheckCircle2, ChevronRight, ChevronLeft, Lock, ArrowLeft } from 'lucide-react';
 
 export default function CreateAuction() {
   const navigate = useNavigate();
@@ -82,14 +82,34 @@ export default function CreateAuction() {
   };
 
   return (
-    <div className="min-h-screen bg-[#08090C] text-[#F5F5F5] py-8 px-4 sm:px-6 max-w-5xl mx-auto pitch-bg">
+    <div className="min-h-screen bg-gradient-to-b from-[#05172E] via-[#020B18] to-[#020A16] text-[#F5F7FF] py-6 px-4 sm:px-6 max-w-5xl mx-auto font-['DM_Sans',sans-serif]">
+      {/* Top Header with Back Navigation */}
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => navigate('/')}
+          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8993A8] hover:text-white transition"
+          title="Back to Home"
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <i className="brand-mark"></i>
+          <span className="font-extrabold text-lg tracking-tight font-['Manrope']">
+            Crick<span className="text-[#D9FF4D]">Auction</span>
+          </span>
+        </div>
+
+        <div className="w-10"></div>
+      </div>
+
       {/* Header */}
-      <div className="mb-8 text-center sm:text-left">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-full text-xs font-bold text-[#B6FF3B] mb-2">
+      <div className="mb-6 text-center sm:text-left">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0B1730] border border-white/10 rounded-full text-xs font-bold text-[#D9FF4D] mb-2">
           <span>STEP {step} OF 3</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Create Auction Arena</h1>
-        <p className="text-sm text-[#A3A7B0] mt-1">Configure your room, pick your IPL franchise, and set the auction parameters.</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-['Manrope']">Create Auction Arena</h1>
+        <p className="text-xs sm:text-sm text-[#8993A8] mt-1">Configure your room, pick your IPL franchise, and set the auction parameters.</p>
       </div>
 
       {error && (
@@ -99,7 +119,7 @@ export default function CreateAuction() {
       )}
 
       {/* Step Wizard Container */}
-      <div className="bg-[#111318] border border-[rgba(255,255,255,0.08)] rounded-2xl p-6 sm:p-8 shadow-2xl">
+      <div className="bg-[#0B1730] border border-white/10 rounded-2xl p-5 sm:p-7 shadow-2xl">
         
         {/* Step 1: Franchise Selection */}
         {step === 1 && (
@@ -113,12 +133,12 @@ export default function CreateAuction() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Enter your name"
-                className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-3">
                 Select Your IPL Franchise
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -131,13 +151,13 @@ export default function CreateAuction() {
                       onClick={() => setSelectedFranchise(team.id)}
                       className={`group relative p-3 sm:p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-between min-h-[150px] sm:min-h-[165px] ${
                         isSelected 
-                          ? 'border-[#B6FF3B] bg-[#181B21] shadow-[0_0_20px_rgba(182,255,59,0.25)] scale-[1.02]' 
-                          : 'border-[rgba(255,255,255,0.08)] bg-[#111318] hover:border-[rgba(255,255,255,0.25)] hover:bg-[#15181F]'
+                          ? 'border-[#D9FF4D] bg-[#0E1E3C] shadow-[0_0_20px_rgba(217,255,77,0.25)] scale-[1.02]' 
+                          : 'border-white/10 bg-[#061224] hover:border-white/25 hover:bg-[#08172E]'
                       }`}
                     >
                       {/* Selected Checkmark Badge */}
                       {isSelected && (
-                        <div className="absolute top-2.5 right-2.5 text-[#B6FF3B]">
+                        <div className="absolute top-2.5 right-2.5 text-[#D9FF4D]">
                           <CheckCircle2 size={18} />
                         </div>
                       )}
@@ -157,10 +177,10 @@ export default function CreateAuction() {
 
                       {/* Team Name & Code */}
                       <div className="w-full text-center mt-1">
-                        <div className="text-base sm:text-lg font-black tracking-wider leading-tight" style={{ color: team.primary }}>
+                        <div className="text-base sm:text-lg font-black tracking-wider leading-tight font-['Manrope']" style={{ color: team.primary }}>
                           {team.id}
                         </div>
-                        <div className="text-[11px] sm:text-xs text-[#A3A7B0] truncate font-medium mt-0.5">
+                        <div className="text-[11px] sm:text-xs text-[#8993A8] truncate font-medium mt-0.5">
                           {team.name}
                         </div>
                       </div>
@@ -174,7 +194,7 @@ export default function CreateAuction() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#B6FF3B] hover:bg-[#a3f024] text-black font-extrabold text-sm rounded-xl transition"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#D9FF4D] hover:bg-[#c7f035] text-[#07111E] font-black text-sm rounded-xl transition shadow-lg"
               >
                 Next: Room Settings <ChevronRight size={18} />
               </button>
@@ -187,19 +207,19 @@ export default function CreateAuction() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
                   Room Name
                 </label>
                 <input
                   type="text"
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
-                  className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                  className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
                   Starting Purse (₹ Crore)
                 </label>
                 <input
@@ -208,12 +228,12 @@ export default function CreateAuction() {
                   max={200}
                   value={startingPurseCr}
                   onChange={(e) => setStartingPurseCr(Number(e.target.value))}
-                  className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                  className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
                   Squad Size Limit (Players per team)
                 </label>
                 <input
@@ -222,12 +242,12 @@ export default function CreateAuction() {
                   max={25}
                   value={maxSquadSize}
                   onChange={(e) => setMaxSquadSize(Number(e.target.value))}
-                  className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                  className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
                   Max Teams
                 </label>
                 <input
@@ -236,12 +256,12 @@ export default function CreateAuction() {
                   max={10}
                   value={maxTeams}
                   onChange={(e) => setMaxTeams(Number(e.target.value))}
-                  className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                  className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
                   Bid Countdown Timer
                 </label>
                 <div className="flex gap-2">
@@ -252,15 +272,15 @@ export default function CreateAuction() {
                     max={60}
                     value={bidTimerSeconds}
                     onChange={(e) => setBidTimerSeconds(Number(e.target.value))}
-                    className="w-2/3 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B] disabled:opacity-40"
+                    className="w-2/3 bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] disabled:opacity-40"
                   />
                   <button
                     type="button"
                     onClick={() => setIsUnlimitedTimer(!isUnlimitedTimer)}
                     className={`w-1/3 px-3 py-2 text-xs font-bold rounded-xl border transition ${
                       isUnlimitedTimer 
-                        ? 'border-[#B6FF3B] bg-[#B6FF3B]/10 text-[#B6FF3B]' 
-                        : 'border-[rgba(255,255,255,0.08)] bg-[#181B21] text-[#A3A7B0]'
+                        ? 'border-[#D9FF4D] bg-[#D9FF4D]/15 text-[#D9FF4D]' 
+                        : 'border-white/10 bg-[#061224] text-[#8993A8]'
                     }`}
                   >
                     Unlimited
@@ -269,12 +289,12 @@ export default function CreateAuction() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2 flex items-center gap-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={isPrivate}
                     onChange={(e) => setIsPrivate(e.target.checked)}
-                    className="w-4 h-4 accent-[#B6FF3B] border-[rgba(255,255,255,0.2)] bg-[#181B21]"
+                    className="w-4 h-4 accent-[#D9FF4D] border-white/20 bg-[#061224]"
                   />
                   Private Room
                 </label>
@@ -282,8 +302,8 @@ export default function CreateAuction() {
             </div>
 
             {isPrivate && (
-              <div className="p-4 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+              <div className="p-4 bg-[#061224] border border-white/10 rounded-xl">
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
                   Room Password
                 </label>
                 <input
@@ -291,25 +311,25 @@ export default function CreateAuction() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Set a password for private room"
-                  className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                  className="w-full bg-[#030914] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
                 />
               </div>
             )}
 
             {/* AI Toggle */}
-            <div className="p-4 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl flex items-center justify-between">
+            <div className="p-4 bg-[#061224] border border-white/10 rounded-xl flex items-center justify-between">
               <div>
-                <div className="font-bold text-sm">Fill Open Slots with AI Teams</div>
-                <div className="text-xs text-[#A3A7B0]">Bots will bid dynamically based on purse and team balance</div>
+                <div className="font-bold text-sm text-white">Fill Open Slots with AI Teams</div>
+                <div className="text-xs text-[#8993A8]">Bots will bid dynamically based on purse and team balance</div>
               </div>
               <button
                 type="button"
                 onClick={() => setAiEnabled(!aiEnabled)}
                 className={`w-12 h-6 flex items-center rounded-full p-1 transition ${
-                  aiEnabled ? 'bg-[#B6FF3B] justify-end' : 'bg-gray-700 justify-start'
+                  aiEnabled ? 'bg-[#D9FF4D] justify-end' : 'bg-gray-700 justify-start'
                 }`}
               >
-                <div className={`w-4 h-4 rounded-full ${aiEnabled ? 'bg-black' : 'bg-white'}`} />
+                <div className={`w-4 h-4 rounded-full ${aiEnabled ? 'bg-[#07111E]' : 'bg-white'}`} />
               </button>
             </div>
 
@@ -317,14 +337,14 @@ export default function CreateAuction() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="inline-flex items-center gap-2 px-5 py-3 bg-[#181B21] border border-[rgba(255,255,255,0.08)] hover:bg-[#20242c] text-[#F5F5F5] font-bold text-sm rounded-xl transition"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-[#061224] border border-white/10 hover:bg-[#0D1C38] text-white font-bold text-sm rounded-xl transition"
               >
                 <ChevronLeft size={18} /> Back
               </button>
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#B6FF3B] hover:bg-[#a3f024] text-black font-extrabold text-sm rounded-xl transition"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#D9FF4D] hover:bg-[#c7f035] text-[#07111E] font-black text-sm rounded-xl transition shadow-lg"
               >
                 Review Summary <ChevronRight size={18} />
               </button>
@@ -335,43 +355,43 @@ export default function CreateAuction() {
         {/* Step 3: Review & Launch */}
         {step === 3 && (
           <div className="space-y-6">
-            <h3 className="text-lg font-bold">Room Summary</h3>
+            <h3 className="text-lg font-bold font-['Manrope'] text-white">Room Summary</h3>
             
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-[#061224] border border-white/10 rounded-xl">
               <div>
-                <span className="text-xs text-[#A3A7B0]">HOST</span>
-                <p className="font-bold text-sm">{displayName} ({selectedFranchise})</p>
+                <span className="text-xs text-[#8993A8]">HOST</span>
+                <p className="font-bold text-sm text-white">{displayName} ({selectedFranchise})</p>
               </div>
               <div>
-                <span className="text-xs text-[#A3A7B0]">STARTING PURSE</span>
-                <p className="font-bold text-sm">₹{startingPurseCr} Cr</p>
+                <span className="text-xs text-[#8993A8]">STARTING PURSE</span>
+                <p className="font-bold text-sm text-[#D9FF4D]">₹{startingPurseCr} Cr</p>
               </div>
               <div>
-                <span className="text-xs text-[#A3A7B0]">SQUAD SIZE</span>
-                <p className="font-bold text-sm">{maxSquadSize} Players</p>
+                <span className="text-xs text-[#8993A8]">SQUAD SIZE</span>
+                <p className="font-bold text-sm text-white">{maxSquadSize} Players</p>
               </div>
               <div>
-                <span className="text-xs text-[#A3A7B0]">TIMER</span>
-                <p className="font-bold text-sm">{isUnlimitedTimer ? 'Unlimited' : `${bidTimerSeconds}s`}</p>
+                <span className="text-xs text-[#8993A8]">TIMER</span>
+                <p className="font-bold text-sm text-white">{isUnlimitedTimer ? 'Unlimited' : `${bidTimerSeconds}s`}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-[#061224] border border-white/10 rounded-xl">
               <div>
-                <span className="text-xs text-[#A3A7B0]">MAX TEAMS</span>
-                <p className="font-bold text-sm">{maxTeams}</p>
+                <span className="text-xs text-[#8993A8]">MAX TEAMS</span>
+                <p className="font-bold text-sm text-white">{maxTeams}</p>
               </div>
               <div>
-                <span className="text-xs text-[#A3A7B0]">PRIVATE</span>
-                <p className="font-bold text-sm">{isPrivate ? 'Yes' : 'No'}</p>
+                <span className="text-xs text-[#8993A8]">PRIVATE</span>
+                <p className="font-bold text-sm text-white">{isPrivate ? 'Yes' : 'No'}</p>
               </div>
               <div>
-                <span className="text-xs text-[#A3A7B0]">AI TEAMS</span>
-                <p className="font-bold text-sm">{aiEnabled ? 'Enabled' : 'Disabled'}</p>
+                <span className="text-xs text-[#8993A8]">AI TEAMS</span>
+                <p className="font-bold text-sm text-white">{aiEnabled ? 'Enabled' : 'Disabled'}</p>
               </div>
               <div>
-                <span className="text-xs text-[#A3A7B0]">AI DIFFICULTY</span>
-                <p className="font-bold text-sm">{aiEnabled ? aiDifficulty : 'N/A'}</p>
+                <span className="text-xs text-[#8993A8]">AI DIFFICULTY</span>
+                <p className="font-bold text-sm text-white">{aiEnabled ? aiDifficulty : 'N/A'}</p>
               </div>
             </div>
 
@@ -379,7 +399,7 @@ export default function CreateAuction() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="inline-flex items-center gap-2 px-5 py-3 bg-[#181B21] border border-[rgba(255,255,255,0.08)] hover:bg-[#20242c] text-[#F5F5F5] font-bold text-sm rounded-xl transition"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-[#061224] border border-white/10 hover:bg-[#0D1C38] text-white font-bold text-sm rounded-xl transition"
               >
                 <ChevronLeft size={18} /> Back
               </button>
@@ -387,7 +407,7 @@ export default function CreateAuction() {
                 type="button"
                 disabled={loading}
                 onClick={handleCreateRoom}
-                className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#B6FF3B] hover:bg-[#a3f024] text-black font-black text-sm rounded-xl transition shadow-[0_0_20px_rgba(182,255,59,0.3)] disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-8 py-3.5 bg-[#D9FF4D] hover:bg-[#c7f035] text-[#07111E] font-black text-sm rounded-xl transition shadow-[0_0_20px_rgba(217,255,77,0.3)] disabled:opacity-50"
               >
                 {loading ? 'Creating...' : 'CREATE & ENTER LOBBY'}
               </button>

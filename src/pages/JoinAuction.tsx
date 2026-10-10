@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ALL_FRANCHISES, getOrCreateUserId, saveRoomSession } from '../lib/utils';
 import { safeFetch } from '../lib/api';
-import { Search, LogIn, Shield, Users, Lock, AlertCircle } from 'lucide-react';
+import { Search, LogIn, Shield, Users, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export default function JoinAuction() {
   const navigate = useNavigate();
@@ -77,25 +77,45 @@ export default function JoinAuction() {
   };
 
   return (
-    <div className="min-h-screen bg-[#08090C] text-[#F5F5F5] flex flex-col justify-center items-center px-4 pitch-bg">
-      <div className="w-full max-w-lg bg-[#111318] border border-[rgba(255,255,255,0.08)] rounded-2xl p-6 sm:p-8 shadow-2xl">
-        <div className="text-center mb-8">
-          <div className="inline-flex p-3 rounded-2xl bg-[#181B21] border border-[rgba(255,255,255,0.08)] mb-3 text-[#B6FF3B]">
-            <LogIn size={28} />
+    <div className="min-h-screen bg-gradient-to-b from-[#05172E] via-[#020B18] to-[#020A16] text-[#F5F7FF] flex flex-col justify-center items-center px-4 py-8 relative font-['DM_Sans',sans-serif]">
+      {/* Top Header with Back Navigation */}
+      <div className="w-full max-w-lg flex items-center justify-between mb-4">
+        <button
+          onClick={() => navigate('/')}
+          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8993A8] hover:text-white transition"
+          title="Back to Home"
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <i className="brand-mark"></i>
+          <span className="font-extrabold text-lg tracking-tight font-['Manrope']">
+            Crick<span className="text-[#D9FF4D]">Auction</span>
+          </span>
+        </div>
+
+        <div className="w-10"></div>
+      </div>
+
+      <div className="w-full max-w-lg bg-[#0B1730] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl relative">
+        <div className="text-center mb-6">
+          <div className="inline-flex p-3 rounded-2xl bg-[#061224] border border-white/10 mb-3 text-[#D9FF4D]">
+            <LogIn size={26} />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Join Auction Room</h1>
-          <p className="text-sm text-[#A3A7B0] mt-1">Enter the 6-character room code to start bidding</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-['Manrope'] text-white">Join Auction Room</h1>
+          <p className="text-xs sm:text-sm text-[#8993A8] mt-1">Enter the 6-character room code to start bidding</p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-sm font-medium text-center flex items-center justify-center gap-2">
+          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs sm:text-sm font-medium text-center flex items-center justify-center gap-2">
             <AlertCircle size={16} /> {error}
           </div>
         )}
 
-        <form onSubmit={handleJoin} className="space-y-6">
+        <form onSubmit={handleJoin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2 text-center">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 text-center">
               Room Code
             </label>
             <div className="relative">
@@ -111,16 +131,16 @@ export default function JoinAuction() {
                 }}
                 onBlur={checkRoom}
                 placeholder="e.g. 7K2P9A"
-                className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl py-4 text-center text-2xl font-mono tracking-widest text-[#B6FF3B] focus:outline-none focus:border-[#B6FF3B] pr-12"
+                className="w-full bg-[#061224] border border-white/10 rounded-xl py-3.5 text-center text-2xl font-mono tracking-widest text-[#D9FF4D] focus:outline-none focus:border-[#D9FF4D] pr-12 font-black"
               />
               {roomInfo && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs">
                   {roomInfo.is_private ? (
-                    <span className="flex items-center gap-1 text-orange-400">
+                    <span className="flex items-center gap-1 text-orange-400 font-bold">
                       <Lock size={14} /> Private
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-green-400">
+                    <span className="flex items-center gap-1 text-green-400 font-bold">
                       <Shield size={14} /> Public
                     </span>
                   )}
@@ -131,7 +151,7 @@ export default function JoinAuction() {
 
           {showPassword && (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
                 Room Password
               </label>
               <input
@@ -140,13 +160,13 @@ export default function JoinAuction() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter room password"
-                className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+                className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
               Your Display Name
             </label>
             <input
@@ -154,34 +174,34 @@ export default function JoinAuction() {
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full bg-[#181B21] border border-[rgba(255,255,255,0.08)] rounded-xl px-4 py-3 text-sm text-[#F5F5F5] focus:outline-none focus:border-[#B6FF3B]"
+              className="w-full bg-[#061224] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#A3A7B0] mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2">
               Preferred Franchise
             </label>
-            <div className="grid grid-cols-5 gap-2.5">
+            <div className="grid grid-cols-5 gap-2">
               {ALL_FRANCHISES.map((f) => (
                 <button
                   key={f.id}
                   type="button"
                   onClick={() => setSelectedFranchise(f.id)}
-                  className={`p-2.5 rounded-xl border text-center font-bold text-xs transition flex flex-col items-center justify-between min-h-[96px] ${
+                  className={`p-2 rounded-xl border text-center font-bold text-xs transition flex flex-col items-center justify-between min-h-[92px] ${
                     selectedFranchise === f.id
-                      ? 'border-[#B6FF3B] bg-[#181B21] text-[#B6FF3B] shadow-[0_0_15px_rgba(182,255,59,0.25)] scale-[1.02]'
-                      : 'border-[rgba(255,255,255,0.08)] bg-[#111318] text-[#A3A7B0] hover:border-[rgba(255,255,255,0.2)]'
+                      ? 'border-[#D9FF4D] bg-[#0E1E3C] text-[#D9FF4D] shadow-[0_0_15px_rgba(217,255,77,0.25)] scale-[1.02]'
+                      : 'border-white/10 bg-[#061224] text-[#8993A8] hover:border-white/20'
                   }`}
                 >
-                  <div className="h-12 w-full flex items-center justify-center my-auto">
+                  <div className="h-11 w-full flex items-center justify-center my-auto">
                     {f.logoUrl ? (
-                      <img src={f.logoUrl} alt={f.id} className="max-h-11 max-w-[48px] object-contain drop-shadow-md" />
+                      <img src={f.logoUrl} alt={f.id} className="max-h-10 max-w-[44px] object-contain drop-shadow-md" />
                     ) : (
                       <span className="text-xl">{f.emoji}</span>
                     )}
                   </div>
-                  <div className="text-[11px] font-black tracking-wider mt-1">{f.id}</div>
+                  <div className="text-[10px] font-black tracking-wider mt-1">{f.id}</div>
                 </button>
               ))}
             </div>
@@ -190,7 +210,7 @@ export default function JoinAuction() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 bg-[#B6FF3B] hover:bg-[#a3f024] text-black font-extrabold text-sm rounded-xl transition shadow-[0_0_20px_rgba(182,255,59,0.3)] disabled:opacity-50"
+            className="w-full py-3.5 bg-[#D9FF4D] hover:bg-[#c7f035] text-[#07111E] font-black text-xs uppercase tracking-wider rounded-xl transition shadow-[0_0_20px_rgba(217,255,77,0.3)] disabled:opacity-50"
           >
             {loading ? 'Joining Room...' : 'ENTER AUCTION LOBBY'}
           </button>

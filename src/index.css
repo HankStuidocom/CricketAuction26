@@ -76,3 +76,81 @@ body {
 .glow-lime { box-shadow: 0 0 24px rgba(132, 204, 22, 0.3); }
 .glow-gold { box-shadow: 0 0 24px rgba(245, 158, 11, 0.3); }
 .glow-red  { box-shadow: 0 0 24px rgba(239, 68, 68, 0.3); }
+
+/* Cricket Ball Animation */
+.cricket-ball {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin: auto;
+  background: radial-gradient(circle at 33% 27%, #fff, #d6d8dc 65%);
+  box-shadow: 0 18px 36px rgba(0,0,0,0.6);
+  position: relative;
+  animation: ball-spin 2s ease-in-out infinite;
+}
+.cricket-ball:after {
+  content: "";
+  position: absolute;
+  inset: 7px 27px;
+  border-left: 2px dashed #d72c47;
+  border-right: 2px dashed #d72c47;
+  border-radius: 50%;
+  transform: rotate(26deg);
+}
+@keyframes ball-spin {
+  50% { transform: translateY(-12px) rotate(13deg); }
+}
+
+/* Brand mark */
+.brand-mark {
+  width: 27px;
+  height: 18px;
+  transform: skew(-21deg);
+  position: relative;
+  display: inline-block;
+}
+.brand-mark:before, .brand-mark:after {
+  content: "";
+  position: absolute;
+  height: 5px;
+  background: #f6f8ff;
+  border-radius: 3px;
+  left: 0;
+}
+.brand-mark:before { width: 27px; top: 1px; }
+.brand-mark:after { width: 19px; top: 10px; left: 3px; }
+
+/* Ball icon watermark */
+.ball-watermark {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #f3f0df;
+  opacity: 0.88;
+}
+.ball-watermark:after {
+  content: "";
+  position: absolute;
+  inset: 4px 16px;
+  border-left: 1px dashed #d93f56;
+  border-right: 1px dashed #d93f56;
+  border-radius: 50%;
+}
+
+/* Live card dot grid */
+.live-grid-pattern {
+  position: absolute;
+  width: 190px;
+  height: 190px;
+  right: 20%;
+  top: 15px;
+  background: radial-gradient(circle, rgba(43, 60, 123, 0.4) 0 1px, transparent 2px);
+  background-size: 12px 12px;
+  opacity: 0.5;
+  transform: rotate(20deg);
+  pointer-events: none;
+}
+
