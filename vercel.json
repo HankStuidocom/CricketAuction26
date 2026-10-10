@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/:match*",
@@ -9,7 +11,7 @@
       "destination": "https://cricket-auction-backend-dtzw.onrender.com/socket.io/:match*"
     },
     {
-      "source": "/((?!api|socket.io).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
