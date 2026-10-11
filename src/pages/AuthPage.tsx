@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { safeFetch } from '../lib/api';
 import GameButton from '../components/GameButton';
 import GamePanel from '../components/GamePanel';
-import { CricketBatBallIcon, TrophyCupIcon, ShieldCrestIcon } from '../components/GameIcons';
+import { CricketBatBallIcon, TrophyCupIcon } from '../components/GameIcons';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 
 export default function AuthPage({ isRegister = false }: { isRegister?: boolean }) {
@@ -54,53 +54,56 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
   };
 
   return (
-    <div className="min-h-screen bg-[#020814] text-[#F8FAFC] flex flex-col justify-center items-center px-4 py-8 relative font-['DM_Sans',sans-serif]">
+    <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] flex flex-col justify-center items-center px-4 py-8 relative font-sans">
       
       {/* Top Header with Back Navigation */}
-      <div className="w-full max-w-md flex items-center justify-between mb-4 pb-3 border-b border-white/8">
+      <div className="w-full max-w-md flex items-center justify-between mb-4 pb-3 border-b border-[#1F2937]">
         <button
           onClick={() => navigate('/')}
-          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8993A8] hover:text-white transition"
+          className="w-9 h-9 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center text-[#86948A] hover:text-[#DFE2EF] hover:border-[#10B981] transition"
           title="Back to Home"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
         </button>
 
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#102D5E] to-[#08152E] border border-white/15 flex items-center justify-center">
-            <CricketBatBallIcon size={16} color="#D9FF4D" />
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-inner">
+            <CricketBatBallIcon size={16} color="#10B981" />
           </div>
-          <span className="font-['Manrope'] font-black text-lg tracking-tight">
-            Crick<span className="text-[#D9FF4D]">Auction</span>
+          <span className="font-display font-bold text-lg tracking-tight text-white">
+            CRICK<span className="text-[#10B981]">AUCTION</span>
+          </span>
+          <span className="text-[10px] font-mono font-bold text-[#86948A] bg-[#1C1F29] px-1.5 py-0.5 rounded-[4px] border border-[#1F2937]">
+            AUTH
           </span>
         </div>
 
-        <div className="w-10"></div>
+        <div className="w-9"></div>
       </div>
 
       <GamePanel glow="none" className="w-full max-w-md p-6 sm:p-8">
         <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-[#091B3A] border border-[#D9FF4D]/30 mb-3 text-[#D9FF4D] shadow-[0_0_20px_rgba(217,255,77,0.25)]">
-            <TrophyCupIcon size={28} color="#D9FF4D" />
+          <div className="inline-flex p-3 rounded-[6px] bg-[#1C1F29] border border-[#10B981]/40 mb-3 text-[#10B981] shadow-[0_0_20px_rgba(16,185,129,0.25)]">
+            <TrophyCupIcon size={26} color="#10B981" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-['Manrope'] text-white">
-            {isRegister ? 'Create Player Profile' : 'Player Sign In'}
+          <h1 className="text-xl sm:text-2xl font-display font-black tracking-tight text-white uppercase">
+            {isRegister ? 'Create Player Profile' : 'Commander Access'}
           </h1>
-          <p className="text-xs sm:text-sm text-[#8993A8] mt-1">
-            {isRegister ? 'Join the IPL 2026 multiplayer auction arena' : 'Sign in to access your squad and rooms'}
+          <p className="text-xs text-[#86948A] mt-1">
+            {isRegister ? 'Register your profile for IPL 2026 multiplayer arena draft' : 'Sign in to access your squad roster and tactical arena'}
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3.5 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-xs sm:text-sm font-medium text-center flex items-center justify-center gap-2">
-            <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+          <div className="mb-6 p-3 bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#FFB4AB] rounded-[6px] text-xs font-medium text-center flex items-center justify-center gap-2">
+            <AlertCircle size={15} className="text-[#EF4444] flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
+            <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-1.5">
               Username
             </label>
             <input
@@ -109,14 +112,14 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. captain_rohit_45"
-              className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold transition"
+              className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-3.5 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-display font-bold transition"
             />
           </div>
 
           {isRegister && (
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
-                Display Name
+              <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-1.5">
+                Display Gamer Tag
               </label>
               <input
                 type="text"
@@ -124,14 +127,14 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="e.g. Hitman Sharma"
-                className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold transition"
+                className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-3.5 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-display font-bold transition"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
-              Password
+            <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-1.5">
+              Secret Passkey
             </label>
             <input
               type="password"
@@ -139,7 +142,7 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold transition"
+              className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-3.5 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold transition"
             />
           </div>
 
@@ -152,23 +155,23 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
               size="lg"
               fullWidth
             >
-              {isRegister ? 'CREATE ACCOUNT' : 'ENTER ARENA'}
+              {isRegister ? 'INITIALIZE PROFILE' : 'ENTER COMMAND ARENA'}
             </GameButton>
           </div>
         </form>
 
-        <div className="mt-6 text-center text-xs text-[#8993A8] border-t border-white/8 pt-4">
+        <div className="mt-6 text-center text-xs text-[#86948A] border-t border-[#1F2937] pt-4">
           {isRegister ? (
             <p>
               Already registered?{' '}
-              <Link to="/login" className="text-[#D9FF4D] font-bold hover:underline">
+              <Link to="/login" className="text-[#10B981] font-bold hover:underline">
                 Sign in to your profile
               </Link>
             </p>
           ) : (
             <p>
-              New to the auction?{' '}
-              <Link to="/register" className="text-[#D9FF4D] font-bold hover:underline">
+              New commander?{' '}
+              <Link to="/register" className="text-[#10B981] font-bold hover:underline">
                 Create a player profile
               </Link>
             </p>

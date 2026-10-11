@@ -7,14 +7,11 @@ import GamePanel from '../components/GamePanel';
 import { 
   CricketBatBallIcon, 
   GavelIcon, 
-  ShieldCrestIcon, 
   PrivateLockIcon, 
   BotsAiIcon, 
-  TimerGaugeIcon, 
-  PurseCoinsIcon, 
   CheckmarkIcon 
 } from '../components/GameIcons';
-import { ArrowLeft, ChevronRight, ChevronLeft, Shield, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
 
 export default function CreateAuction() {
   const navigate = useNavigate();
@@ -25,9 +22,9 @@ export default function CreateAuction() {
   const [displayName, setDisplayName] = useState(() => {
     try {
       const user = JSON.parse(localStorage.getItem('ca26_user') || '{}');
-      return user.display_name || user.username || 'Auction Boss';
+      return user.display_name || user.username || 'Tactical Boss';
     } catch {
-      return 'Auction Boss';
+      return 'Tactical Boss';
     }
   });
 
@@ -96,86 +93,101 @@ export default function CreateAuction() {
   const selectedTeamData = ALL_FRANCHISES.find(f => f.id === selectedFranchise) || ALL_FRANCHISES[0];
 
   return (
-    <div className="min-h-screen bg-[#020814] text-[#F8FAFC] py-6 px-4 sm:px-6 max-w-5xl mx-auto font-['DM_Sans',sans-serif]">
+    <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] py-6 px-4 sm:px-6 max-w-5xl mx-auto font-sans">
       
       {/* Top Header with Back Navigation */}
-      <div className="flex items-center justify-between mb-6 pb-3 border-b border-white/8">
+      <div className="flex items-center justify-between mb-6 pb-3 border-b border-[#1F2937]">
         <button
           onClick={() => navigate('/')}
-          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8993A8] hover:text-white transition"
+          className="w-9 h-9 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center text-[#86948A] hover:text-[#DFE2EF] hover:border-[#10B981] transition"
           title="Back to Home"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
         </button>
 
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#102D5E] to-[#08152E] border border-white/15 flex items-center justify-center">
-            <CricketBatBallIcon size={16} color="#D9FF4D" />
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-inner">
+            <CricketBatBallIcon size={16} color="#10B981" />
           </div>
-          <span className="font-['Manrope'] font-black text-lg tracking-tight">
-            Crick<span className="text-[#D9FF4D]">Auction</span>
+          <span className="font-display font-bold text-lg tracking-tight text-white">
+            CRICK<span className="text-[#10B981]">AUCTION</span>
+          </span>
+          <span className="text-[10px] font-mono font-bold text-[#86948A] bg-[#1C1F29] px-1.5 py-0.5 rounded-[4px] border border-[#1F2937]">
+            SETUP
           </span>
         </div>
 
-        <div className="w-10"></div>
+        <div className="w-9"></div>
       </div>
 
-      {/* Esports Tournament Step Progress Bar */}
+      {/* Tactical Step Progress Bar */}
       <div className="mb-6">
-        <div className="flex items-center justify-between max-w-md mx-auto mb-3">
+        <div className="flex items-center justify-between max-w-md mx-auto mb-4">
           <div className="flex items-center gap-2">
-            <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-['Manrope'] font-black text-xs ${step >= 1 ? 'bg-[#D9FF4D] text-[#051120]' : 'bg-white/10 text-[#8993A8]'}`}>
+            <span className={`w-7 h-7 rounded-[4px] flex items-center justify-center font-display font-black text-xs transition-colors ${
+              step >= 1 
+                ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
+                : 'bg-[#1C1F29] text-[#86948A] border border-[#1F2937]'
+            }`}>
               1
             </span>
-            <span className={`text-xs font-bold uppercase tracking-wider ${step === 1 ? 'text-white' : 'text-[#8993A8]'}`}>
+            <span className={`text-[11px] font-display font-bold uppercase tracking-wider ${step === 1 ? 'text-[#10B981]' : 'text-[#86948A]'}`}>
               Franchise
             </span>
           </div>
 
-          <div className="h-[2px] w-12 bg-white/15">
-            <div className={`h-full bg-[#D9FF4D] transition-all duration-300 ${step >= 2 ? 'w-full' : 'w-0'}`} />
+          <div className="h-[2px] w-12 bg-[#1F2937]">
+            <div className={`h-full bg-[#10B981] transition-all duration-300 ${step >= 2 ? 'w-full' : 'w-0'}`} />
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-['Manrope'] font-black text-xs ${step >= 2 ? 'bg-[#D9FF4D] text-[#051120]' : 'bg-white/10 text-[#8993A8]'}`}>
+            <span className={`w-7 h-7 rounded-[4px] flex items-center justify-center font-display font-black text-xs transition-colors ${
+              step >= 2 
+                ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
+                : 'bg-[#1C1F29] text-[#86948A] border border-[#1F2937]'
+            }`}>
               2
             </span>
-            <span className={`text-xs font-bold uppercase tracking-wider ${step === 2 ? 'text-white' : 'text-[#8993A8]'}`}>
-              Arena Rules
+            <span className={`text-[11px] font-display font-bold uppercase tracking-wider ${step === 2 ? 'text-[#10B981]' : 'text-[#86948A]'}`}>
+              Rules
             </span>
           </div>
 
-          <div className="h-[2px] w-12 bg-white/15">
-            <div className={`h-full bg-[#D9FF4D] transition-all duration-300 ${step >= 3 ? 'w-full' : 'w-0'}`} />
+          <div className="h-[2px] w-12 bg-[#1F2937]">
+            <div className={`h-full bg-[#10B981] transition-all duration-300 ${step >= 3 ? 'w-full' : 'w-0'}`} />
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-['Manrope'] font-black text-xs ${step === 3 ? 'bg-[#D9FF4D] text-[#051120]' : 'bg-white/10 text-[#8993A8]'}`}>
+            <span className={`w-7 h-7 rounded-[4px] flex items-center justify-center font-display font-black text-xs transition-colors ${
+              step === 3 
+                ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_12px_rgba(16,185,129,0.35)]' 
+                : 'bg-[#1C1F29] text-[#86948A] border border-[#1F2937]'
+            }`}>
               3
             </span>
-            <span className={`text-xs font-bold uppercase tracking-wider ${step === 3 ? 'text-white' : 'text-[#8993A8]'}`}>
-              Launch
+            <span className={`text-[11px] font-display font-bold uppercase tracking-wider ${step === 3 ? 'text-[#10B981]' : 'text-[#86948A]'}`}>
+              Deploy
             </span>
           </div>
         </div>
 
         <div className="text-center sm:text-left">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-['Manrope'] text-white">
-            {step === 1 && 'Select Your Franchise'}
-            {step === 2 && 'Tournament Configuration'}
-            {step === 3 && 'Arena Launchpad'}
+          <h1 className="text-xl sm:text-2xl font-display font-black tracking-tight text-white uppercase">
+            {step === 1 && 'Select Tactical Franchise'}
+            {step === 2 && 'Tournament Parameters'}
+            {step === 3 && 'Auction Deployment'}
           </h1>
-          <p className="text-xs sm:text-sm text-[#8993A8] mt-0.5">
-            {step === 1 && 'Choose the IPL franchise you want to lead as the franchise boss.'}
-            {step === 2 && 'Set starting purse, squad capacity, bid timers, and AI bots.'}
-            {step === 3 && 'Review your auction settings and open the live tournament lobby.'}
+          <p className="text-xs text-[#86948A] mt-0.5">
+            {step === 1 && 'Choose your franchise team to represent as team commander.'}
+            {step === 2 && 'Define starting purse, squad caps, countdown timers, and AI agents.'}
+            {step === 3 && 'Review your auction parameters and initialize the live room.'}
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-500/15 border border-red-500/30 text-red-300 rounded-2xl text-xs sm:text-sm font-medium flex items-center gap-2">
-          <AlertCircle size={18} className="text-red-400 flex-shrink-0" />
+        <div className="mb-6 p-3.5 bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#FFB4AB] rounded-[6px] text-xs font-medium flex items-center gap-2">
+          <AlertCircle size={16} className="text-[#EF4444] flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -187,22 +199,22 @@ export default function CreateAuction() {
         {step === 1 && (
           <div className="p-5 sm:p-7 space-y-6">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
-                Your Host Gamer Tag
+              <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
+                Commander Display Tag
               </label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Enter your boss name"
-                className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold"
+                placeholder="Enter commander tag"
+                className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-display font-bold"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-3 font-['Manrope'] flex items-center justify-between">
-                <span>Select IPL Franchise (Selected: {selectedTeamData.name})</span>
-                <span className="text-[#D9FF4D] font-mono text-[11px]">10 AVAILABLE</span>
+              <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-3 flex items-center justify-between">
+                <span>Select Franchise (Selected: {selectedTeamData.name})</span>
+                <span className="text-[#10B981] font-mono text-[11px]">10 AVAILABLE</span>
               </label>
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -213,38 +225,38 @@ export default function CreateAuction() {
                       key={team.id}
                       type="button"
                       onClick={() => setSelectedFranchise(team.id)}
-                      className={`group relative p-3 sm:p-4 rounded-2xl border text-center transition-all flex flex-col items-center justify-between min-h-[150px] sm:min-h-[165px] ${
+                      className={`group relative p-3 sm:p-4 rounded-[6px] border text-center transition-all flex flex-col items-center justify-between min-h-[145px] ${
                         isSelected 
-                          ? 'border-[#D9FF4D] bg-[#0E2042] shadow-[0_0_24px_rgba(217,255,77,0.3)] scale-[1.02]' 
-                          : 'border-white/10 bg-[#050D1C] hover:border-white/25 hover:bg-[#08152B]'
+                          ? 'border-[#10B981] bg-[#1C1F29] shadow-[0_0_20px_rgba(16,185,129,0.25)]' 
+                          : 'border-[#1F2937] bg-[#111827] hover:border-[#3C4A42] hover:bg-[#181B25]'
                       }`}
                     >
                       {/* Selected Checkmark Badge */}
                       {isSelected && (
-                        <div className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-[#D9FF4D] text-[#051120] flex items-center justify-center shadow">
-                          <CheckmarkIcon size={12} color="#051120" />
+                        <div className="absolute top-2 right-2 w-4 h-4 rounded-[4px] bg-[#10B981] text-[#090D16] flex items-center justify-center shadow">
+                          <CheckmarkIcon size={10} color="#090D16" />
                         </div>
                       )}
 
                       {/* Team Logo */}
-                      <div className="w-full flex-1 flex items-center justify-center py-1 sm:py-2">
+                      <div className="w-full flex-1 flex items-center justify-center py-1">
                         {team.logoUrl ? (
                           <img 
                             src={team.logoUrl} 
                             alt={team.id} 
-                            className="h-16 sm:h-20 w-auto max-w-[85%] object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] transition-transform duration-200 group-hover:scale-105" 
+                            className="h-16 w-auto max-w-[85%] object-contain drop-shadow transition-transform duration-150 group-hover:scale-105" 
                           />
                         ) : (
-                          <span className="text-3xl sm:text-4xl">{team.emoji}</span>
+                          <span className="text-3xl">{team.emoji}</span>
                         )}
                       </div>
 
                       {/* Team Name & Code */}
                       <div className="w-full text-center mt-1">
-                        <div className="text-base sm:text-lg font-black tracking-wider leading-tight font-['Manrope']" style={{ color: team.primary }}>
+                        <div className="text-base font-display font-black tracking-wider leading-tight" style={{ color: team.primary }}>
                           {team.id}
                         </div>
-                        <div className="text-[11px] text-[#8993A8] truncate font-medium mt-0.5">
+                        <div className="text-[11px] text-[#86948A] truncate font-medium mt-0.5">
                           {team.name}
                         </div>
                       </div>
@@ -254,7 +266,7 @@ export default function CreateAuction() {
               </div>
             </div>
 
-            <div className="pt-4 flex justify-end border-t border-white/8">
+            <div className="pt-4 flex justify-end border-t border-[#1F2937]">
               <GameButton
                 type="button"
                 onClick={() => setStep(2)}
@@ -262,7 +274,7 @@ export default function CreateAuction() {
                 size="md"
                 iconRight={<ChevronRight size={16} />}
               >
-                Next: Arena Rules
+                Continue: Parameters
               </GameButton>
             </div>
           </div>
@@ -273,21 +285,21 @@ export default function CreateAuction() {
           <div className="p-5 sm:p-7 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
-                  Arena Name
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
+                  Arena Title
                 </label>
                 <input
                   type="text"
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
-                  className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold"
+                  className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-display font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope'] flex items-center justify-between">
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 flex items-center justify-between">
                   <span>Starting Purse (₹ Crore)</span>
-                  <span className="text-[#D9FF4D] font-mono">₹{startingPurseCr} Cr</span>
+                  <span className="text-[#10B981] font-mono">₹{startingPurseCr} Cr</span>
                 </label>
                 <input
                   type="number"
@@ -295,13 +307,13 @@ export default function CreateAuction() {
                   max={200}
                   value={startingPurseCr}
                   onChange={(e) => setStartingPurseCr(Number(e.target.value))}
-                  className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold"
+                  className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
-                  Squad Size Limit (Per Team)
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
+                  Squad Roster Limit
                 </label>
                 <input
                   type="number"
@@ -309,12 +321,12 @@ export default function CreateAuction() {
                   max={25}
                   value={maxSquadSize}
                   onChange={(e) => setMaxSquadSize(Number(e.target.value))}
-                  className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold"
+                  className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
                   Max Teams in Room
                 </label>
                 <input
@@ -323,14 +335,14 @@ export default function CreateAuction() {
                   max={10}
                   value={maxTeams}
                   onChange={(e) => setMaxTeams(Number(e.target.value))}
-                  className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold"
+                  className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope'] flex items-center justify-between">
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 flex items-center justify-between">
                   <span>Bid Countdown Timer</span>
-                  <span className="text-[#00E5FF] font-mono">{isUnlimitedTimer ? 'Unlimited Mode' : `${bidTimerSeconds}s`}</span>
+                  <span className="text-[#10B981] font-mono">{isUnlimitedTimer ? 'Unlimited Mode' : `${bidTimerSeconds}s`}</span>
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -340,15 +352,15 @@ export default function CreateAuction() {
                     max={60}
                     value={bidTimerSeconds}
                     onChange={(e) => setBidTimerSeconds(Number(e.target.value))}
-                    className="w-2/3 bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold disabled:opacity-40"
+                    className="w-2/3 bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold disabled:opacity-40"
                   />
                   <button
                     type="button"
                     onClick={() => setIsUnlimitedTimer(!isUnlimitedTimer)}
-                    className={`w-1/3 px-3 py-2 text-xs font-black rounded-xl border transition uppercase tracking-wider font-['Manrope'] ${
+                    className={`w-1/3 px-3 py-2 text-xs font-display font-bold rounded-[6px] border transition uppercase tracking-wider ${
                       isUnlimitedTimer 
-                        ? 'border-[#D9FF4D] bg-[#D9FF4D]/20 text-[#D9FF4D]' 
-                        : 'border-white/12 bg-[#050E1D] text-[#8993A8]'
+                        ? 'border-[#10B981] bg-[#10B981]/20 text-[#10B981]' 
+                        : 'border-[#1F2937] bg-[#111827] text-[#86948A] hover:border-[#3C4A42]'
                     }`}
                   >
                     Unlimited
@@ -356,53 +368,55 @@ export default function CreateAuction() {
                 </div>
               </div>
 
-              {/* Private Room Toggle */}
+              {/* Private Room Security */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
-                  Room Security
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
+                  Room Security Mode
                 </label>
                 <button
                   type="button"
                   onClick={() => setIsPrivate(!isPrivate)}
-                  className={`w-full p-3 rounded-xl border flex items-center justify-between transition ${
-                    isPrivate ? 'border-[#00E5FF] bg-[#00E5FF]/10 text-white' : 'border-white/12 bg-[#050E1D] text-[#8993A8]'
+                  className={`w-full p-2.5 rounded-[6px] border flex items-center justify-between transition ${
+                    isPrivate 
+                      ? 'border-[#06B6D4] bg-[#06B6D4]/10 text-white' 
+                      : 'border-[#1F2937] bg-[#111827] text-[#86948A] hover:border-[#3C4A42]'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <PrivateLockIcon size={16} color={isPrivate ? '#00E5FF' : '#8993A8'} />
-                    <span className="text-xs font-bold">{isPrivate ? 'Private (Password Required)' : 'Public (Anyone Can Join)'}</span>
+                    <PrivateLockIcon size={15} color={isPrivate ? '#06B6D4' : '#86948A'} />
+                    <span className="text-xs font-bold">{isPrivate ? 'Private (Password Required)' : 'Public Arena (Open)'}</span>
                   </div>
-                  <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${isPrivate ? 'border-[#00E5FF] bg-[#00E5FF]' : 'border-white/20'}`}>
-                    {isPrivate && <CheckmarkIcon size={10} color="#051120" />}
+                  <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center ${isPrivate ? 'border-[#06B6D4] bg-[#06B6D4]' : 'border-[#1F2937]'}`}>
+                    {isPrivate && <CheckmarkIcon size={10} color="#003640" />}
                   </span>
                 </button>
               </div>
             </div>
 
             {isPrivate && (
-              <div className="p-4 bg-[#050E1D] border border-[#00E5FF]/30 rounded-xl">
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#00E5FF] mb-2 font-['Manrope']">
-                  Set Room Password
+              <div className="p-4 bg-[#111827] border border-[#06B6D4]/40 rounded-[6px]">
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#06B6D4] mb-2">
+                  Set Room Passkey
                 </label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter a secret password"
-                  className="w-full bg-[#020814] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#00E5FF] font-bold"
+                  placeholder="Enter secret room password"
+                  className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#06B6D4] font-mono font-bold"
                 />
               </div>
             )}
 
             {/* AI Toggle */}
-            <div className="p-4 bg-[#050E1D] border border-purple-500/30 rounded-2xl flex items-center justify-between">
+            <div className="p-4 bg-[#111827] border border-[#1F2937] rounded-[6px] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
-                  <BotsAiIcon size={20} color="#D8B4FE" />
+                <div className="w-9 h-9 rounded-[6px] bg-[#1C1F29] border border-[#1F2937] text-[#10B981] flex items-center justify-center">
+                  <BotsAiIcon size={18} color="#10B981" />
                 </div>
                 <div>
-                  <div className="font-['Manrope'] font-black text-sm text-white">Fill Open Slots with AI Bots</div>
-                  <div className="text-xs text-[#8993A8]">Autonomous AI will bid strategically to complete rosters</div>
+                  <div className="font-display font-bold text-sm text-white">Fill Open Slots with AI Franchise Bots</div>
+                  <div className="text-xs text-[#86948A]">Autonomous algorithms calculate bids based on squad needs</div>
                 </div>
               </div>
 
@@ -411,7 +425,7 @@ export default function CreateAuction() {
                   <select
                     value={aiDifficulty}
                     onChange={(e: any) => setAiDifficulty(e.target.value)}
-                    className="bg-[#020814] border border-purple-500/40 rounded-xl px-3 py-1.5 text-xs text-purple-300 font-bold focus:outline-none"
+                    className="bg-[#0F131C] border border-[#10B981]/50 rounded-[4px] px-3 py-1.5 text-xs text-[#10B981] font-mono font-bold focus:outline-none"
                   >
                     <option value="EASY">EASY</option>
                     <option value="MEDIUM">MEDIUM</option>
@@ -422,20 +436,20 @@ export default function CreateAuction() {
                 <button
                   type="button"
                   onClick={() => setAiEnabled(!aiEnabled)}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 transition ${
-                    aiEnabled ? 'bg-[#D9FF4D] justify-end' : 'bg-gray-700 justify-start'
+                  className={`w-11 h-6 flex items-center rounded-full p-1 transition ${
+                    aiEnabled ? 'bg-[#10B981] justify-end' : 'bg-[#1C1F29] border border-[#1F2937] justify-start'
                   }`}
                 >
-                  <div className={`w-4 h-4 rounded-full ${aiEnabled ? 'bg-[#051120]' : 'bg-white'}`} />
+                  <div className={`w-4 h-4 rounded-full ${aiEnabled ? 'bg-[#090D16]' : 'bg-[#86948A]'}`} />
                 </button>
               </div>
             </div>
 
-            <div className="pt-4 flex justify-between border-t border-white/8">
+            <div className="pt-4 flex justify-between border-t border-[#1F2937]">
               <GameButton
                 type="button"
                 onClick={() => setStep(1)}
-                variant="glass"
+                variant="secondary"
                 size="md"
                 icon={<ChevronLeft size={16} />}
               >
@@ -449,7 +463,7 @@ export default function CreateAuction() {
                 size="md"
                 iconRight={<ChevronRight size={16} />}
               >
-                Review Summary
+                Review & Deploy
               </GameButton>
             </div>
           </div>
@@ -458,8 +472,8 @@ export default function CreateAuction() {
         {/* STEP 3: REVIEW & LAUNCH */}
         {step === 3 && (
           <div className="p-5 sm:p-7 space-y-6">
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0C1E3C] to-[#071329] border border-white/10 flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center p-2">
+            <div className="p-4 rounded-[6px] bg-[#181B25] border border-[#1F2937] flex items-center gap-4">
+              <div className="w-14 h-14 rounded-[4px] bg-[#111827] border border-[#1F2937] flex items-center justify-center p-2">
                 <img 
                   src={selectedTeamData.logoUrl} 
                   alt={selectedTeamData.name} 
@@ -467,64 +481,64 @@ export default function CreateAuction() {
                 />
               </div>
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D9FF4D] block">
-                  ARENA HOST FRANCHISE
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#10B981] block">
+                  HOST FRANCHISE COMMAND
                 </span>
-                <h3 className="font-['Manrope'] font-black text-xl text-white">
+                <h3 className="font-display font-black text-xl text-white">
                   {selectedTeamData.name} ({selectedTeamData.id})
                 </h3>
-                <p className="text-xs text-[#8993A8]">
-                  Host Owner: <span className="text-white font-bold">{displayName}</span> · Arena: <span className="text-white font-bold">{roomName}</span>
+                <p className="text-xs text-[#86948A]">
+                  Commander: <span className="text-[#DFE2EF] font-bold">{displayName}</span> · Arena: <span className="text-[#DFE2EF] font-bold">{roomName}</span>
                 </p>
               </div>
             </div>
 
             {/* Parameter Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-[#050E1D] border border-white/10">
-                <span className="text-[10px] text-[#8993A8] font-bold block uppercase">Starting Purse</span>
-                <p className="font-['Manrope'] font-black text-base text-[#D9FF4D]">₹{startingPurseCr} Cr</p>
+              <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Starting Purse</span>
+                <p className="font-mono font-bold text-base text-[#10B981]">₹{startingPurseCr} Cr</p>
               </div>
-              <div className="p-3 rounded-xl bg-[#050E1D] border border-white/10">
-                <span className="text-[10px] text-[#8993A8] font-bold block uppercase">Squad Size</span>
-                <p className="font-['Manrope'] font-black text-base text-white">{maxSquadSize} Players</p>
+              <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Roster Cap</span>
+                <p className="font-mono font-bold text-base text-white">{maxSquadSize} Players</p>
               </div>
-              <div className="p-3 rounded-xl bg-[#050E1D] border border-white/10">
-                <span className="text-[10px] text-[#8993A8] font-bold block uppercase">Bid Timer</span>
-                <p className="font-['Manrope'] font-black text-base text-[#00E5FF]">
+              <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Bid Timer</span>
+                <p className="font-mono font-bold text-base text-[#10B981]">
                   {isUnlimitedTimer ? 'Unlimited' : `${bidTimerSeconds}s`}
                 </p>
               </div>
-              <div className="p-3 rounded-xl bg-[#050E1D] border border-white/10">
-                <span className="text-[10px] text-[#8993A8] font-bold block uppercase">Max Teams</span>
-                <p className="font-['Manrope'] font-black text-base text-white">{maxTeams} Teams</p>
+              <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Franchise Slots</span>
+                <p className="font-mono font-bold text-base text-white">{maxTeams} Slots</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-[#050E1D] border border-white/10">
-                <span className="text-[10px] text-[#8993A8] font-bold block uppercase">Privacy</span>
-                <p className="font-['Manrope'] font-black text-sm text-white">
-                  {isPrivate ? '🔒 Private (Password)' : '🌐 Public'}
+              <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Security</span>
+                <p className="font-display font-bold text-xs text-white">
+                  {isPrivate ? '🔒 Private (Passkey)' : '🌐 Public Room'}
                 </p>
               </div>
-              <div className="p-3 rounded-xl bg-[#050E1D] border border-white/10">
-                <span className="text-[10px] text-[#8993A8] font-bold block uppercase">AI Bots</span>
-                <p className="font-['Manrope'] font-black text-sm text-white">
+              <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">AI Sub-agents</span>
+                <p className="font-display font-bold text-xs text-white">
                   {aiEnabled ? `🤖 Active (${aiDifficulty})` : 'Disabled'}
                 </p>
               </div>
-              <div className="p-3 rounded-xl bg-[#050E1D] border border-white/10">
-                <span className="text-[10px] text-[#8993A8] font-bold block uppercase">Player Pool</span>
-                <p className="font-['Manrope'] font-black text-sm text-white">IPL 2026 (250 Players)</p>
+              <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Player Pool</span>
+                <p className="font-display font-bold text-xs text-white">IPL 2026 (250 Players)</p>
               </div>
             </div>
 
-            <div className="pt-4 flex justify-between border-t border-white/8">
+            <div className="pt-4 flex justify-between border-t border-[#1F2937]">
               <GameButton
                 type="button"
                 onClick={() => setStep(2)}
-                variant="glass"
+                variant="secondary"
                 size="md"
                 icon={<ChevronLeft size={16} />}
               >
@@ -538,9 +552,9 @@ export default function CreateAuction() {
                 onClick={handleCreateRoom}
                 variant="primary"
                 size="lg"
-                icon={<GavelIcon size={18} color="#051120" />}
+                icon={<GavelIcon size={18} color="#090D16" />}
               >
-                LAUNCH ARENA & OPEN LOBBY
+                DEPLOY ARENA & OPEN LOBBY
               </GameButton>
             </div>
           </div>

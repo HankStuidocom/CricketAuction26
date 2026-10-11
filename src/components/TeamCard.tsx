@@ -44,16 +44,13 @@ export default function TeamCard({
     <div
       onClick={isSelectable ? onSelect : undefined}
       className={`
-        relative rounded-2xl overflow-hidden transition-all duration-200
-        ${isSelectable ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.99]' : ''}
+        relative rounded-[6px] overflow-hidden transition-all duration-200
+        ${isSelectable ? 'cursor-pointer hover:border-[#10B981]/40' : ''}
         ${isSelected 
-          ? 'bg-gradient-to-b from-[#10244C] to-[#081329] border-2 shadow-[0_0_24px_rgba(217,255,77,0.35)]' 
-          : 'bg-gradient-to-b from-[#09152B]/90 via-[#060E1E]/95 to-[#030814]/98 border border-white/10 hover:border-white/25'}
+          ? 'bg-[#1A2234] border-2 border-[#10B981] shadow-[0_0_20px_rgba(16,185,129,0.3)]' 
+          : 'bg-[#111827] border border-[#1F2937] hover:border-[#3C4A42]'}
         ${className}
       `}
-      style={{
-        borderColor: isSelected ? '#D9FF4D' : undefined
-      }}
     >
       {/* Top team accent bar */}
       <div 
@@ -63,8 +60,8 @@ export default function TeamCard({
 
       {/* Selected Indicator */}
       {isSelected && (
-        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#D9FF4D] text-[#051120] flex items-center justify-center shadow-lg z-10">
-          <CheckmarkIcon size={14} color="#051120" />
+        <div className="absolute top-2 right-2 w-5 h-5 rounded-[4px] bg-[#10B981] text-[#090D16] flex items-center justify-center shadow-lg z-10">
+          <CheckmarkIcon size={12} color="#090D16" />
         </div>
       )}
 
@@ -72,7 +69,7 @@ export default function TeamCard({
         {/* Header: Crest + Franchise Info */}
         <div className="flex items-center gap-3">
           <div 
-            className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center p-1.5 flex-shrink-0 relative overflow-hidden shadow-inner"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-[4px] bg-[#0F131C] border border-[#1F2937] flex items-center justify-center p-1.5 flex-shrink-0 relative overflow-hidden"
             style={{ borderColor: `${primaryColor}40` }}
           >
             {franchise.logoUrl ? (
@@ -89,37 +86,37 @@ export default function TeamCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span 
-                className="font-['Manrope'] font-black text-sm tracking-wide"
+                className="font-['Outfit'] font-extrabold text-sm tracking-wide"
                 style={{ color: primaryColor }}
               >
                 {franchise.id}
               </span>
 
               {isHost && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 text-[8px] font-extrabold uppercase">
-                  <CrownHostIcon size={9} color="#FBBF24" /> HOST
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-[2px] bg-[#F59E0B]/15 text-[#FFB95F] text-[8px] font-mono font-bold uppercase">
+                  <CrownHostIcon size={9} color="#FFB95F" /> HOST
                 </span>
               )}
 
               {isAi && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[8px] font-extrabold uppercase">
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-[2px] bg-purple-500/15 text-purple-300 text-[8px] font-mono font-bold uppercase">
                   <BotsAiIcon size={9} color="#D8B4FE" /> AI
                 </span>
               )}
 
               {statusBadge && (
-                <span className="px-1.5 py-0.2 rounded bg-white/10 text-[#8993A8] text-[8px] font-bold">
+                <span className="px-1.5 py-0.2 rounded-[2px] bg-[#1F2937] text-[#BBCABF] text-[8px] font-mono font-medium">
                   {statusBadge}
                 </span>
               )}
             </div>
 
-            <h4 className="font-['Manrope'] font-bold text-xs text-white truncate">
+            <h4 className="font-['Outfit'] font-bold text-xs text-[#DFE2EF] truncate">
               {displayName || franchise.name}
             </h4>
 
             {franchise.tagline && !displayName && (
-              <span className="text-[10px] text-[#8993A8] block italic truncate">
+              <span className="text-[10px] text-[#86948A] block italic truncate">
                 "{franchise.tagline}"
               </span>
             )}
@@ -128,13 +125,13 @@ export default function TeamCard({
 
         {/* Financial & Squad Stats (when active in room) */}
         {(purseRemainingLakhs !== undefined || squadCount !== undefined) && (
-          <div className="mt-3 pt-2.5 border-t border-white/5 grid grid-cols-2 gap-2 text-[10px]">
+          <div className="mt-3 pt-2.5 border-t border-[#1F2937] grid grid-cols-2 gap-2 text-[10px]">
             {purseRemainingLakhs !== undefined && (
               <div>
-                <span className="text-[#8993A8] block text-[9px] uppercase font-bold flex items-center gap-1">
-                  <PurseCoinsIcon size={10} color="#8993A8" /> Purse
+                <span className="text-[#86948A] block text-[9px] uppercase font-bold flex items-center gap-1">
+                  <PurseCoinsIcon size={10} color="#86948A" /> Purse
                 </span>
-                <span className="font-['Manrope'] font-black text-xs text-white">
+                <span className="font-mono font-bold text-xs text-[#DFE2EF]">
                   {formatCr(purseRemainingLakhs)}
                 </span>
               </div>
@@ -142,10 +139,10 @@ export default function TeamCard({
 
             {squadCount !== undefined && (
               <div className="text-right">
-                <span className="text-[#8993A8] block text-[9px] uppercase font-bold flex items-center justify-end gap-1">
+                <span className="text-[#86948A] block text-[9px] uppercase font-bold flex items-center justify-end gap-1">
                   Squad ({squadCount}/{maxSquad})
                 </span>
-                <span className="font-['Manrope'] font-bold text-xs text-[#D9FF4D]">
+                <span className="font-mono font-bold text-xs text-[#10B981]">
                   {overseasCount !== undefined ? `${overseasCount}/4 OS` : `${squadCount} Bought`}
                 </span>
               </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type GameButtonVariant = 'primary' | 'cyan' | 'gold' | 'danger' | 'glass' | 'dark';
+export type GameButtonVariant = 'primary' | 'secondary' | 'coral' | 'lime' | 'cyan' | 'gold' | 'danger' | 'inverted' | 'outlined' | 'glass' | 'dark';
 export type GameButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 
 interface GameButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -25,34 +25,45 @@ export default function GameButton({
   ...props
 }: GameButtonProps) {
   
-  // Base styling: tactile gaming feel, sports typography, bevel border, active press state
-  const baseStyles = "relative inline-flex items-center justify-center font-['Manrope'] font-black uppercase tracking-wider transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none disabled:shadow-none active:translate-y-0.5";
+  // Base styling: Tactical Pitch Command precision, Outfit typography, architectural borders
+  const baseStyles = "relative inline-flex items-center justify-center font-['Outfit'] font-bold uppercase tracking-wider transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:transform-none disabled:shadow-none active:translate-y-0.5";
 
   const sizeStyles: Record<GameButtonSize, string> = {
-    sm: "text-[10px] py-1.5 px-3 rounded-lg gap-1.5 shadow-[0_2px_0_rgba(0,0,0,0.4)] active:shadow-none",
-    md: "text-xs py-2.5 px-4 rounded-xl gap-2 shadow-[0_3px_0_rgba(0,0,0,0.5)] active:shadow-none",
-    lg: "text-sm py-3.5 px-6 rounded-xl gap-2.5 shadow-[0_4px_0_rgba(0,0,0,0.6)] active:shadow-none",
-    xl: "text-base py-4.5 px-8 rounded-2xl gap-3 shadow-[0_5px_0_rgba(0,0,0,0.7)] active:shadow-none"
+    sm: "text-[11px] py-1.5 px-3 rounded-[4px] gap-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]",
+    md: "text-xs py-2 px-4 rounded-[6px] gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]",
+    lg: "text-sm py-2.5 px-5 rounded-[6px] gap-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]",
+    xl: "text-base py-3.5 px-7 rounded-[8px] gap-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]"
   };
 
   const variantStyles: Record<GameButtonVariant, string> = {
-    // 1. Electric Lime (Primary Bidding & CTAs)
-    primary: "bg-gradient-to-b from-[#E7FF70] via-[#D9FF4D] to-[#B8E619] text-[#051120] border-t border-white/60 border-b border-[#82A800] shadow-[0_4px_20px_rgba(217,255,77,0.35)] hover:brightness-105 hover:shadow-[0_6px_25px_rgba(217,255,77,0.5)]",
-    
-    // 2. Cyber Cyan (Esports Match / Host)
-    cyan: "bg-gradient-to-b from-[#40E0D0] via-[#00C6FF] to-[#0072FF] text-[#020B18] border-t border-white/60 border-b border-[#004B99] shadow-[0_4px_20px_rgba(0,198,255,0.35)] hover:brightness-105",
+    // 1. Primary Tactical Action (#10B981 Emerald with #090D16 dark text, Outfit font, inner glow)
+    primary: "bg-[#10B981] hover:bg-[#059669] text-[#090D16] border border-[#10B981]/50 shadow-[0_0_20px_rgba(16,185,129,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] hover:shadow-[0_0_26px_rgba(16,185,129,0.5)] font-extrabold",
+    coral: "bg-[#10B981] hover:bg-[#059669] text-[#090D16] border border-[#10B981]/50 shadow-[0_0_20px_rgba(16,185,129,0.35),inset_0_1px_0_rgba(255,255,255,0.3)] font-extrabold",
+    lime: "bg-[#4EDEA3] hover:bg-[#10B981] text-[#003824] border border-[#4EDEA3]/50 shadow-[0_0_20px_rgba(78,222,163,0.35)] font-extrabold",
 
-    // 3. Gold Champion (Points / Trophy / Winner)
-    gold: "bg-gradient-to-b from-[#FFE259] via-[#FFA751] to-[#FF8C00] text-[#0A0E1A] border-t border-white/60 border-b border-[#B35F00] shadow-[0_4px_20px_rgba(255,167,81,0.35)] hover:brightness-105",
+    // 2. Secondary Command Action (Transparent / #1C1F29, border #1F2937, text #DFE2EF, hover border #06B6D4)
+    secondary: "bg-[#1C1F29] hover:bg-[#1A2234] text-[#DFE2EF] border border-[#1F2937] hover:border-[#06B6D4] hover:text-white shadow-[0_2px_8px_rgba(0,0,0,0.4)]",
 
-    // 4. Crimson Danger (Skip / Unsold / End)
-    danger: "bg-gradient-to-b from-[#FF512F] via-[#DD2476] to-[#A00E4A] text-white border-t border-white/40 border-b border-[#700A34] shadow-[0_4px_16px_rgba(221,36,118,0.3)] hover:brightness-105",
+    // 3. Tactical Cyan
+    cyan: "bg-[#06B6D4] hover:bg-[#0891B2] text-[#003640] border border-[#06B6D4]/50 shadow-[0_0_20px_rgba(6,182,212,0.35)] font-extrabold",
 
-    // 5. Tactical Glass (Secondary actions, filters, tabs)
-    glass: "bg-white/[0.07] hover:bg-white/[0.14] text-[#E2E8F0] hover:text-white border border-white/15 hover:border-white/30 backdrop-blur-md shadow-[0_2px_8px_rgba(0,0,0,0.4)]",
+    // 4. Championship Gold
+    gold: "bg-[#F59E0B] hover:bg-[#D97706] text-[#472A00] border border-[#F59E0B]/50 shadow-[0_0_20px_rgba(245,158,11,0.35)] font-extrabold",
 
-    // 6. Deep Dark (Subtle / Panel footer actions)
-    dark: "bg-[#0A162B] hover:bg-[#0F2140] text-[#8993A8] hover:text-white border border-white/10 hover:border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+    // 5. Destructive / Crimson Emergency
+    danger: "bg-[#EF4444]/15 hover:bg-[#EF4444]/25 text-[#FFB4AB] border border-[#EF4444]/60 shadow-[0_0_16px_rgba(239,68,68,0.25)]",
+
+    // 6. Inverted Action
+    inverted: "bg-[#DFE2EF] hover:bg-[#FFFFFF] text-[#0F131C] border border-white/20 shadow-md font-bold",
+
+    // 7. Outlined Action
+    outlined: "bg-transparent hover:bg-[#181B25] text-[#DFE2EF] border border-[#3C4A42] hover:border-[#86948A]",
+
+    // 8. Tactical Glass
+    glass: "bg-[#111827]/90 hover:bg-[#1A2234] text-[#DFE2EF] hover:text-white border border-[#1F2937] hover:border-[#3C4A42] backdrop-blur-md shadow-sm",
+
+    // 9. Deep Dark
+    dark: "bg-[#0F131C] hover:bg-[#181B25] text-[#BBCABF] hover:text-[#DFE2EF] border border-[#1F2937]"
   };
 
   return (

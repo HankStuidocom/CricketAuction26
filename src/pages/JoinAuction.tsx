@@ -8,10 +8,9 @@ import {
   CricketBatBallIcon, 
   PrivateLockIcon, 
   ShieldCrestIcon, 
-  GavelIcon, 
-  CheckmarkIcon 
+  GavelIcon 
 } from '../components/GameIcons';
-import { ArrowLeft, AlertCircle, LogIn, Lock, Shield } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Lock, Shield } from 'lucide-react';
 
 export default function JoinAuction() {
   const navigate = useNavigate();
@@ -19,9 +18,9 @@ export default function JoinAuction() {
   const [displayName, setDisplayName] = useState(() => {
     try {
       const user = JSON.parse(localStorage.getItem('ca26_user') || '{}');
-      return user.display_name || user.username || 'Guest Player';
+      return user.display_name || user.username || 'Tactical Player';
     } catch {
-      return 'Guest Player';
+      return 'Tactical Player';
     }
   });
   const [selectedFranchise, setSelectedFranchise] = useState('MI');
@@ -86,54 +85,57 @@ export default function JoinAuction() {
   };
 
   return (
-    <div className="min-h-screen bg-[#020814] text-[#F8FAFC] flex flex-col justify-center items-center px-4 py-8 relative font-['DM_Sans',sans-serif]">
+    <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] flex flex-col justify-center items-center px-4 py-8 relative font-sans">
       
       {/* Top Header with Back Navigation */}
-      <div className="w-full max-w-lg flex items-center justify-between mb-4 pb-3 border-b border-white/8">
+      <div className="w-full max-w-lg flex items-center justify-between mb-4 pb-3 border-b border-[#1F2937]">
         <button
           onClick={() => navigate('/')}
-          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#8993A8] hover:text-white transition"
+          className="w-9 h-9 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center text-[#86948A] hover:text-[#DFE2EF] hover:border-[#10B981] transition"
           title="Back to Home"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
         </button>
 
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#102D5E] to-[#08152E] border border-white/15 flex items-center justify-center">
-            <CricketBatBallIcon size={16} color="#D9FF4D" />
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-inner">
+            <CricketBatBallIcon size={16} color="#10B981" />
           </div>
-          <span className="font-['Manrope'] font-black text-lg tracking-tight">
-            Crick<span className="text-[#D9FF4D]">Auction</span>
+          <span className="font-display font-bold text-lg tracking-tight text-white">
+            CRICK<span className="text-[#10B981]">AUCTION</span>
+          </span>
+          <span className="text-[10px] font-mono font-bold text-[#86948A] bg-[#1C1F29] px-1.5 py-0.5 rounded-[4px] border border-[#1F2937]">
+            CONNECT
           </span>
         </div>
 
-        <div className="w-10"></div>
+        <div className="w-9"></div>
       </div>
 
       <GamePanel glow="none" className="w-full max-w-lg p-6 sm:p-8">
         <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-[#091B3A] border border-[#00E5FF]/30 mb-3 text-[#00E5FF] shadow-[0_0_20px_rgba(0,229,255,0.25)]">
-            <ShieldCrestIcon size={28} color="#00E5FF" />
+          <div className="inline-flex p-3 rounded-[6px] bg-[#1C1F29] border border-[#06B6D4]/40 mb-3 text-[#06B6D4] shadow-[0_0_16px_rgba(6,182,212,0.25)]">
+            <ShieldCrestIcon size={24} color="#06B6D4" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight font-['Manrope'] text-white">
-            Join Auction Arena
+          <h1 className="text-xl sm:text-2xl font-display font-black tracking-tight text-white uppercase">
+            Join Tactical Arena
           </h1>
-          <p className="text-xs sm:text-sm text-[#8993A8] mt-1">
-            Enter the 6-character tournament invite code to join your crew
+          <p className="text-xs text-[#86948A] mt-1">
+            Input the 6-character room access code to join the live draft lobby
           </p>
         </div>
 
         {error && (
-          <div className="mb-6 p-3.5 bg-red-500/15 border border-red-500/30 text-red-300 rounded-xl text-xs sm:text-sm font-medium text-center flex items-center justify-center gap-2">
-            <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
+          <div className="mb-6 p-3 bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#FFB4AB] rounded-[6px] text-xs font-medium text-center flex items-center justify-center gap-2">
+            <AlertCircle size={15} className="text-[#EF4444] flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleJoin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 text-center font-['Manrope']">
-              Arena Invite Code
+            <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 text-center">
+              Arena Access Code
             </label>
             <div className="relative">
               <input
@@ -148,17 +150,17 @@ export default function JoinAuction() {
                 }}
                 onBlur={checkRoom}
                 placeholder="e.g. 7K2P9A"
-                className="w-full bg-[#050E1D] border-2 border-white/15 focus:border-[#D9FF4D] rounded-2xl py-3.5 text-center text-3xl font-mono tracking-widest text-[#D9FF4D] focus:outline-none focus:shadow-[0_0_25px_rgba(217,255,77,0.3)] font-black uppercase transition"
+                className="w-full bg-[#0F131C] border-2 border-[#1F2937] focus:border-[#10B981] rounded-[6px] py-3 text-center text-3xl font-mono tracking-widest text-[#10B981] focus:outline-none focus:shadow-[0_0_20px_rgba(16,185,129,0.25)] font-bold uppercase transition"
               />
               {roomInfo && (
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs">
                   {roomInfo.is_private ? (
-                    <span className="flex items-center gap-1 text-orange-400 font-bold bg-orange-500/10 px-2 py-0.5 rounded-md border border-orange-500/30">
-                      <Lock size={12} /> Private
+                    <span className="flex items-center gap-1 text-[#F59E0B] font-mono text-[11px] font-bold bg-[#F59E0B]/10 px-2 py-0.5 rounded-[4px] border border-[#F59E0B]/30">
+                      <Lock size={11} /> PRIVATE
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded-md border border-green-500/30">
-                      <Shield size={12} /> Public
+                    <span className="flex items-center gap-1 text-[#10B981] font-mono text-[11px] font-bold bg-[#10B981]/10 px-2 py-0.5 rounded-[4px] border border-[#10B981]/30">
+                      <Shield size={11} /> PUBLIC
                     </span>
                   )}
                 </div>
@@ -167,39 +169,39 @@ export default function JoinAuction() {
           </div>
 
           {showPassword && (
-            <div className="p-4 bg-[#050E1D] border border-orange-500/30 rounded-xl animate-fade-up">
-              <label className="block text-xs font-bold uppercase tracking-wider text-orange-300 mb-2 font-['Manrope'] flex items-center gap-1.5">
-                <PrivateLockIcon size={14} color="#FB923C" />
-                <span>Room Password Required</span>
+            <div className="p-3.5 bg-[#181B25] border border-[#F59E0B]/40 rounded-[6px]">
+              <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#F59E0B] mb-1.5 flex items-center gap-1.5">
+                <PrivateLockIcon size={14} color="#F59E0B" />
+                <span>Room Passkey Required</span>
               </label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password to enter private room"
-                className="w-full bg-[#020814] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-orange-400 font-bold"
+                placeholder="Enter room password"
+                className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-3.5 py-2 text-sm text-white focus:outline-none focus:border-[#F59E0B] font-mono font-bold"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope']">
-              Your Player Gamer Tag
+            <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-1.5">
+              Player Display Tag
             </label>
             <input
               type="text"
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full bg-[#050E1D] border border-white/12 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#D9FF4D] font-bold"
+              className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-3.5 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-display font-bold"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#8993A8] mb-2 font-['Manrope'] flex items-center justify-between">
-              <span>Preferred Franchise Slot</span>
-              <span className="text-[#D9FF4D] font-bold text-xs">{selectedFranchise}</span>
+            <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 flex items-center justify-between">
+              <span>Selected Franchise Slot</span>
+              <span className="text-[#10B981] font-mono font-bold text-xs">{selectedFranchise}</span>
             </label>
             <div className="grid grid-cols-5 gap-2">
               {ALL_FRANCHISES.map((f) => {
@@ -209,20 +211,20 @@ export default function JoinAuction() {
                     key={f.id}
                     type="button"
                     onClick={() => setSelectedFranchise(f.id)}
-                    className={`p-2 rounded-xl border text-center font-bold text-xs transition flex flex-col items-center justify-between min-h-[92px] ${
+                    className={`p-2 rounded-[6px] border text-center font-bold text-xs transition flex flex-col items-center justify-between min-h-[86px] ${
                       isSelected
-                        ? 'border-[#D9FF4D] bg-[#0E2042] text-[#D9FF4D] shadow-[0_0_18px_rgba(217,255,77,0.3)] scale-[1.03]'
-                        : 'border-white/10 bg-[#050E1D] text-[#8993A8] hover:border-white/25 hover:bg-[#08152B]'
+                        ? 'border-[#10B981] bg-[#1C1F29] text-[#10B981] shadow-[0_0_16px_rgba(16,185,129,0.25)] scale-[1.02]'
+                        : 'border-[#1F2937] bg-[#111827] text-[#86948A] hover:border-[#3C4A42] hover:bg-[#181B25]'
                     }`}
                   >
-                    <div className="h-11 w-full flex items-center justify-center my-auto">
+                    <div className="h-10 w-full flex items-center justify-center my-auto">
                       {f.logoUrl ? (
-                        <img src={f.logoUrl} alt={f.id} className="max-h-10 max-w-[44px] object-contain drop-shadow-md" />
+                        <img src={f.logoUrl} alt={f.id} className="max-h-9 max-w-[42px] object-contain drop-shadow" />
                       ) : (
                         <span className="text-xl">{f.emoji}</span>
                       )}
                     </div>
-                    <div className="text-[10px] font-black tracking-wider mt-1">{f.id}</div>
+                    <div className="text-[10px] font-display font-black tracking-wider mt-1">{f.id}</div>
                   </button>
                 );
               })}
@@ -237,9 +239,9 @@ export default function JoinAuction() {
               variant="primary"
               size="lg"
               fullWidth
-              icon={<GavelIcon size={18} color="#051120" />}
+              icon={<GavelIcon size={18} color="#090D16" />}
             >
-              ENTER ARENA LOBBY
+              ENTER LOBBY DECK
             </GameButton>
           </div>
         </form>

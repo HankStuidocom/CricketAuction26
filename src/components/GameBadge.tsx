@@ -16,41 +16,41 @@ export function RoleBadge({ role, compact = false }: { role: string; compact?: b
     'Batter': {
       label: 'BATTER',
       short: 'BAT',
-      bg: 'bg-blue-500/15',
-      text: 'text-blue-400',
-      border: 'border-blue-500/30',
-      icon: <RoleBatterIcon size={compact ? 12 : 14} color="#60A5FA" />
+      bg: 'bg-[#06B6D4]/15',
+      text: 'text-[#4CD7F6]',
+      border: 'border-[#06B6D4]/30',
+      icon: <RoleBatterIcon size={compact ? 11 : 12} color="#4CD7F6" />
     },
     'Bowler': {
       label: 'BOWLER',
       short: 'BOWL',
-      bg: 'bg-emerald-500/15',
-      text: 'text-emerald-400',
-      border: 'border-emerald-500/30',
-      icon: <RoleBowlerIcon size={compact ? 12 : 14} color="#34D399" />
+      bg: 'bg-[#10B981]/15',
+      text: 'text-[#10B981]',
+      border: 'border-[#10B981]/30',
+      icon: <RoleBowlerIcon size={compact ? 11 : 12} color="#10B981" />
     },
     'All-Rounder': {
       label: 'ALL-ROUNDER',
       short: 'AR',
-      bg: 'bg-amber-500/15',
-      text: 'text-amber-400',
-      border: 'border-amber-500/30',
-      icon: <RoleAllRounderIcon size={compact ? 12 : 14} color="#FBBF24" />
+      bg: 'bg-[#F59E0B]/15',
+      text: 'text-[#FFB95F]',
+      border: 'border-[#F59E0B]/30',
+      icon: <RoleAllRounderIcon size={compact ? 11 : 12} color="#FFB95F" />
     },
     'Wicket-Keeper': {
       label: 'WICKET-KEEPER',
       short: 'WK',
       bg: 'bg-purple-500/15',
-      text: 'text-purple-400',
+      text: 'text-purple-300',
       border: 'border-purple-500/30',
-      icon: <RoleWicketKeeperIcon size={compact ? 12 : 14} color="#C084FC" />
+      icon: <RoleWicketKeeperIcon size={compact ? 11 : 12} color="#C084FC" />
     }
   };
 
   const config = roleConfig[role] || roleConfig['Batter'];
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-['Manrope'] font-bold uppercase tracking-wider border ${config.bg} ${config.text} ${config.border} ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 h-[22px] rounded-[3px] font-mono font-bold uppercase tracking-wider border ${config.bg} ${config.text} ${config.border} ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
       {config.icon}
       <span>{compact ? config.short : config.label}</span>
     </span>
@@ -63,15 +63,15 @@ export function StatusOriginBadge({ status, country }: { status: string; country
 
   if (isOverseas) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-500/15 text-orange-400 border border-orange-500/30 font-['Manrope'] font-extrabold text-[9px] uppercase tracking-wider">
-        <OverseasGlobeIcon size={12} color="#FB923C" />
+      <span className="inline-flex items-center gap-1 px-2 h-[22px] rounded-[3px] bg-[#F59E0B]/15 text-[#FFB95F] border border-[#F59E0B]/30 font-mono font-bold text-[9px] uppercase tracking-wider">
+        <OverseasGlobeIcon size={11} color="#FFB95F" />
         <span>{country ? country : 'OVERSEAS'}</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 font-['Manrope'] font-extrabold text-[9px] uppercase tracking-wider">
+    <span className="inline-flex items-center gap-1 px-2 h-[22px] rounded-[3px] bg-[#06B6D4]/15 text-[#4CD7F6] border border-[#06B6D4]/30 font-mono font-bold text-[9px] uppercase tracking-wider">
       <span>🇮🇳 {country || 'INDIA'}</span>
     </span>
   );
@@ -80,7 +80,7 @@ export function StatusOriginBadge({ status, country }: { status: string; country
 // 3. Points Hex Badge
 export function PointsBadge({ points }: { points: number }) {
   return (
-    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 text-amber-300 font-['Manrope'] font-black text-[10px] tracking-wide shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+    <div className="inline-flex items-center gap-1 px-2 h-[22px] rounded-[3px] bg-[#F59E0B]/15 border border-[#F59E0B]/35 text-[#FFB95F] font-mono font-bold text-[10px] tracking-wide">
       <span className="text-[10px]">★</span>
       <span>{points} PTS</span>
     </div>
@@ -90,8 +90,8 @@ export function PointsBadge({ points }: { points: number }) {
 // 4. Live Broadcast Badge
 export function LivePill({ label = 'LIVE' }: { label?: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF2A55]/20 border border-[#FF2A55]/50 text-[#FF3B66] font-['Manrope'] font-extrabold text-[10px] tracking-wider uppercase animate-pulse">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#FF2A55]"></span>
+    <span className="inline-flex items-center gap-1.5 px-2.5 h-[22px] rounded-full bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#FFB4AB] font-['Outfit'] font-bold text-[10px] tracking-wider uppercase">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#EF4444] animate-pulse"></span>
       <span>{label}</span>
     </span>
   );
@@ -100,8 +100,8 @@ export function LivePill({ label = 'LIVE' }: { label?: string }) {
 // 5. Host Badge
 export function HostBadge() {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/40 font-['Manrope'] font-extrabold text-[9px] uppercase tracking-wider">
-      <CrownHostIcon size={11} color="#FBBF24" />
+    <span className="inline-flex items-center gap-1 px-2 h-[22px] rounded-[3px] bg-[#F59E0B]/15 text-[#FFB95F] border border-[#F59E0B]/35 font-mono font-bold text-[9px] uppercase tracking-wider">
+      <CrownHostIcon size={11} color="#FFB95F" />
       <span>HOST</span>
     </span>
   );
@@ -110,7 +110,7 @@ export function HostBadge() {
 // 6. AI Bot Badge
 export function AiBotBadge({ difficulty }: { difficulty?: string }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-['Manrope'] font-extrabold text-[9px] uppercase tracking-wider">
+    <span className="inline-flex items-center gap-1 px-2 h-[22px] rounded-[3px] bg-purple-500/15 text-purple-300 border border-purple-500/30 font-mono font-bold text-[9px] uppercase tracking-wider">
       <BotsAiIcon size={11} color="#D8B4FE" />
       <span>AI BOT {difficulty ? `(${difficulty})` : ''}</span>
     </span>
