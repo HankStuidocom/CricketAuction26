@@ -92,10 +92,20 @@ export function setupSocketHandlers(io: Server) {
   io.on('connection', (socket: Socket) => {
     
     socket.on('join_room', (data) => {
-      const { roomCode, userId, franchise, displayName, password } = data;
+      const { roomCode, userId, franchise, displayName, password, isSpectator } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return socket.emit('error', { message: 'Room not found' });
+
+      // Handle pure spectator mode without taking up team slots
+      if (isSpectator) {
+        socket.join(normalizedCode);
+        const state = buildFullRoomState(normalizedCode);
+        if (state) {
+          socket.emit('room_state', state);
+        }
+        return;
+      }
 
       // Check password for private rooms
       if (room.is_private && room.password_hash) {
@@ -142,6 +152,18 @@ export function setupSocketHandlers(io: Server) {
 
       socket.emit('room_joined', { room, participant });
       emitRoomState(io, normalizedCode);
+    });
+
+    socket.on('spectate_room', (data) => {
+      const { roomCode } = data;
+      const normalizedCode = (roomCode || '').trim().toUpperCase();
+      const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
+      if (!room) return socket.emit('error', { message: 'Room not found' });
+      socket.join(normalizedCode);
+      const state = buildFullRoomState(normalizedCode);
+      if (state) {
+        socket.emit('room_state', state);
+      }
     });
 
     socket.on('start_auction', (data) => {

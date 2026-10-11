@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getSocketUrl } from '../lib/api';
 
-export function useAuction(roomCode: string, myFranchise?: string, myUserId?: string) {
+export function useAuction(roomCode: string, myFranchise?: string, myUserId?: string, isSpectator?: boolean) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [roomState, setRoomState] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,11 +19,19 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
 
     newSocket.on('connect', () => {
       setConnected(true);
-      newSocket.emit('join_room', { 
-        roomCode, 
-        franchise: myFranchise,
-        userId: myUserId || 'guest-' + Math.random().toString(36).substring(7)
-      });
+      if (isSpectator) {
+        newSocket.emit('join_room', {
+          roomCode,
+          isSpectator: true,
+          userId: myUserId || 'spectator-' + Math.random().toString(36).substring(7)
+        });
+      } else {
+        newSocket.emit('join_room', { 
+          roomCode, 
+          franchise: myFranchise,
+          userId: myUserId || 'guest-' + Math.random().toString(36).substring(7)
+        });
+      }
     });
 
     newSocket.on('disconnect', () => {

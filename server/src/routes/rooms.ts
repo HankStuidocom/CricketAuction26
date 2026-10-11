@@ -7,11 +7,69 @@ import { Room } from '../types';
 
 const router = Router();
 
-// List public rooms
+// List public rooms (with optional live filter and full leaderboard/purse enrichment)
 router.get('/', (req, res) => {
   try {
-    const rooms = db.prepare('SELECT * FROM rooms WHERE is_private = 0 ORDER BY created_at DESC LIMIT 50').all();
-    res.json(rooms);
+    const liveOnly = req.query.live === 'true' || req.query.status === 'IN_PROGRESS';
+    let query = 'SELECT * FROM rooms WHERE is_private = 0';
+    if (liveOnly) {
+      query += ' AND status = "IN_PROGRESS"';
+    }
+    query += ' ORDER BY created_at DESC LIMIT 50';
+    const rooms = db.prepare(query).all() as any[];
+
+    const enrichedRooms = rooms.map(room => {
+      // 1. Participant count & details
+      const participants = db.prepare('SELECT * FROM room_participants WHERE room_id = ?').all(room.id) as any[];
+      const teamsCount = participants.length;
+
+      // 2. Host info & purse
+      const host = db.prepare('SELECT * FROM users WHERE id = ?').get(room.host_id) as any;
+      const hostParticipant = participants.find((p: any) => p.is_host === 1 || p.user_id === room.host_id);
+      const remainingPurseLakhs = hostParticipant ? hostParticipant.purse_remaining_lakhs : room.starting_purse_lakhs;
+
+      // 3. Highest bid in auction
+      const maxBidRecord = db.prepare('SELECT MAX(amount_lakhs) as max_bid FROM bids WHERE room_id = ?').get(room.id) as any;
+      const highestBidLakhs = Math.max(room.current_bid_lakhs || 0, maxBidRecord?.max_bid || 0);
+
+      // 4. Team points & Leaderboard
+      const teamStats = participants.map((p: any) => {
+        const pointsRow = db.prepare(`
+          SELECT COALESCE(SUM(pl.game_points), 0) as pts
+          FROM squad_players sp
+          JOIN players pl ON pl.id = sp.player_id
+          WHERE sp.room_id = ? AND sp.franchise_id = ?
+        `).get(room.id, p.franchise_id) as any;
+        return {
+          franchise_id: p.franchise_id,
+          display_name: p.display_name,
+          points: pointsRow?.pts || 0,
+          purse_remaining_lakhs: p.purse_remaining_lakhs
+        };
+      });
+
+      // Sort by points descending
+      teamStats.sort((a: any, b: any) => b.points - a.points);
+      const leadingTeam = teamStats[0] || { franchise_id: room.host_franchise || 'CSK', points: 0 };
+      const runnerUpTeam = teamStats[1] || (teamStats.length > 0 ? null : { franchise_id: 'GT', points: 0 });
+
+      return {
+        ...room,
+        teams_count: teamsCount,
+        host_user: host ? {
+          username: host.username,
+          display_name: host.display_name,
+          avatar_emoji: host.avatar_emoji
+        } : null,
+        host_purse_lakhs: remainingPurseLakhs,
+        highest_bid_lakhs: highestBidLakhs,
+        leading_team: leadingTeam,
+        runner_up_team: runnerUpTeam,
+        team_leaderboard: teamStats
+      };
+    });
+
+    res.json(enrichedRooms);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

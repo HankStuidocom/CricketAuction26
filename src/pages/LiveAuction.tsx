@@ -27,7 +27,7 @@ import {
   CloseIcon,
   TrophyCupIcon
 } from '../components/GameIcons';
-import { AlertCircle, LogOut } from 'lucide-react';
+import { AlertCircle, LogOut, Eye, ArrowLeft } from 'lucide-react';
 import { sounds } from '../utils/sound';
 
 export default function LiveAuction() {
@@ -35,12 +35,15 @@ export default function LiveAuction() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const searchParams = new URLSearchParams(location.search);
+  const isSpectator = location.state?.spectator === true || searchParams.get('spectate') === 'true' || searchParams.get('mode') === 'spectator';
+
   const savedSession = getRoomSession(code || '');
   const myFranchise = location.state?.franchise || savedSession.franchise || 'CSK';
-  const myDisplayName = location.state?.displayName || savedSession.displayName || 'Player';
+  const myDisplayName = location.state?.displayName || savedSession.displayName || (isSpectator ? 'Spectator' : 'Player');
   const myUserId = location.state?.userId || savedSession.userId || getOrCreateUserId();
 
-  const { roomState, error, connected, chatMessages, placeBid, hostAction, sendChat } = useAuction(code || '', myFranchise, myUserId);
+  const { roomState, error, connected, chatMessages, placeBid, hostAction, sendChat } = useAuction(code || '', myFranchise, myUserId, isSpectator);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [activeTab, setActiveTab] = useState<'teams' | 'chat'>('teams');
@@ -116,31 +119,55 @@ export default function LiveAuction() {
         {/* Top Auction Header HUD */}
         <div className="flex justify-between items-center bg-[#111827] border border-[#1F2937] px-4 py-3 rounded-[6px] mb-4 backdrop-blur-xl shadow-lg">
           <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-ping"></span>
+            <span className={`w-2.5 h-2.5 rounded-full ${isSpectator ? 'bg-[#06B6D4]' : 'bg-[#10B981]'} animate-ping`}></span>
             <div>
-              <div className="text-[10px] font-bold text-[#86948A] uppercase tracking-wider font-mono">
-                ARENA #{code}
+              <div className="text-[10px] font-bold text-[#86948A] uppercase tracking-wider font-mono flex items-center gap-2">
+                <span>ARENA #{code}</span>
+                {isSpectator && (
+                  <span className="px-1.5 py-0.2 rounded-[2px] bg-[#06B6D4]/20 text-[#06B6D4] text-[9px] font-bold font-mono tracking-wider">
+                    SPECTATOR
+                  </span>
+                )}
               </div>
               <div className="font-['Outfit'] font-bold text-sm sm:text-base flex items-center gap-2">
-                {myTeamData.logoUrl ? (
-                  <img src={myTeamData.logoUrl} alt={myFranchise} className="w-5 h-5 object-contain drop-shadow" />
-                ) : (
-                  <span>{myTeamData.emoji}</span>
-                )}
-                <span style={{ color: myTeamData.primary }}>{myFranchise}</span>
-                <span className="text-[#86948A]/40">|</span>
-                <span className="text-xs font-bold text-[#86948A]">{myDisplayName}</span>
-                {isHost && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-[2px] bg-[#F59E0B]/15 text-[#FFB95F] text-[8px] font-mono font-bold">
-                    <CrownHostIcon size={10} color="#FFB95F" /> HOST
+                {isSpectator ? (
+                  <span className="text-[#06B6D4] flex items-center gap-1.5 text-xs sm:text-sm font-semibold">
+                    <Eye size={14} className="text-[#06B6D4]" /> Live Spectator Stream
                   </span>
+                ) : (
+                  <>
+                    {myTeamData.logoUrl ? (
+                      <img src={myTeamData.logoUrl} alt={myFranchise} className="w-5 h-5 object-contain drop-shadow" />
+                    ) : (
+                      <span>{myTeamData.emoji}</span>
+                    )}
+                    <span style={{ color: myTeamData.primary }}>{myFranchise}</span>
+                    <span className="text-[#86948A]/40">|</span>
+                    <span className="text-xs font-bold text-[#86948A]">{myDisplayName}</span>
+                    {isHost && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-[2px] bg-[#F59E0B]/15 text-[#FFB95F] text-[8px] font-mono font-bold">
+                        <CrownHostIcon size={10} color="#FFB95F" /> HOST
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Timer Readout */}
+          {/* Timer Readout & Spectator Exit */}
           <div className="flex items-center gap-3">
+            {isSpectator && (
+              <button
+                onClick={() => navigate('/')}
+                className="px-2.5 py-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937] hover:border-[#EF4444] text-[#86948A] hover:text-[#FFB4AB] text-xs font-mono font-bold flex items-center gap-1 transition"
+                title="Exit Spectator Mode"
+              >
+                <ArrowLeft size={13} />
+                <span className="hidden sm:inline">EXIT</span>
+              </button>
+            )}
+
             {isPaused ? (
               <span className="px-3 py-1 bg-red-500/20 border border-red-500/40 text-red-300 font-bold text-xs rounded-[4px] uppercase tracking-wider font-['Outfit']">
                 PAUSED
@@ -221,7 +248,16 @@ export default function LiveAuction() {
 
         {/* Thumb-Friendly Tactile Bid Action Section */}
         <div className="mt-auto pt-4 max-w-md mx-auto w-full">
-          {isHighestBidder ? (
+          {isSpectator ? (
+            <div className="w-full py-3.5 px-6 rounded-[6px] bg-[#111827] border border-[#06B6D4]/40 text-center shadow-lg">
+              <span className="font-['Outfit'] font-bold text-sm text-[#06B6D4] flex items-center justify-center gap-2 uppercase tracking-wide">
+                <Eye size={16} /> SPECTATOR BROADCAST MODE
+              </span>
+              <span className="text-[10px] text-[#86948A] font-mono mt-0.5 block">
+                Live stream only · Bidding controls disabled for spectators
+              </span>
+            </div>
+          ) : isHighestBidder ? (
             <div className="w-full py-3.5 px-6 rounded-[6px] bg-[#1A2234] border border-[#10B981] text-center shadow-lg">
               <span className="font-['Outfit'] font-bold text-sm text-[#10B981] flex items-center justify-center gap-2 uppercase tracking-wide">
                 <CheckmarkIcon size={16} color="#10B981" />
@@ -245,8 +281,8 @@ export default function LiveAuction() {
             </GameButton>
           )}
 
-          {/* My Purse HUD Strip */}
-          {myParticipant && (
+          {/* My Purse HUD Strip (Only if participant) */}
+          {!isSpectator && myParticipant && (
             <div className="mt-3 p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-[4px] bg-[#10B981]/15 flex items-center justify-center">
@@ -275,8 +311,8 @@ export default function LiveAuction() {
       {/* Side Console / Team Deck (Desktop Right / Mobile Bottom) */}
       <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-[#1F2937] bg-[#0F131C] p-4 flex flex-col justify-between">
         <div>
-          {/* Host Control Deck - Visible only to host */}
-          {isHost && (
+          {/* Host Control Deck - Visible only to host (never for spectators) */}
+          {!isSpectator && isHost && (
             <div className="mb-5 p-3.5 bg-[#111827] border border-[#1F2937] rounded-[6px]">
               <div className="text-[10px] font-mono font-bold text-[#86948A] uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
                 <CrownHostIcon size={12} color="#F59E0B" />
