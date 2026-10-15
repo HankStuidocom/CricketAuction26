@@ -109,7 +109,7 @@ async function runTests() {
     processBid(roomCode, 'CSK', rivalBidAmt + 9999, `key-${testRunKey}-4`);
     assert(false, 'Arbitrary bid amount should fail');
   } catch (err: any) {
-    assert(err.message === 'Invalid bid amount', 'Invalid bid amount rejected correctly');
+    assert(err.message && err.message.includes('Invalid bid amount'), 'Invalid bid amount rejected correctly');
   }
 
   // 6. Test Player Sale & Purse Deduction

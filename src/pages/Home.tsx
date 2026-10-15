@@ -116,8 +116,6 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [publicRooms, setPublicRooms] = useState<any[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Friends / Teams sub-state
   const [selectedFranchise, setSelectedFranchise] = useState('CSK');
@@ -141,7 +139,7 @@ export default function Home() {
   const [profileSubtab, setProfileSubtab] = useState<'overview' | 'stats' | 'career'>('overview');
 
   // Matches tab filter
-  const [matchesFilter, setMatchesFilter] = useState<'live' | 'brackets' | 'finished'>('live');
+  const [matchesFilter, setMatchesFilter] = useState<'live' | 'waiting' | 'brackets' | 'finished'>('live');
 
   useEffect(() => {
     try {
@@ -221,23 +219,17 @@ export default function Home() {
 
   const activeRoster = ROSTER_DATA[selectedFranchise] || ROSTER_DATA['CSK'];
 
-  // FILTER RULES: Public & Currently Live Rooms ONLY
+  // FILTER RULES: Public & Currently Live Rooms (including paused)
   const publicLiveRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
-    const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(r.status);
+    const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED'].includes(r.status);
     return isPublic && isLive;
   });
 
-  // Filtered rooms if user typed in search bar
-  const displayedLiveRooms = publicLiveRooms.filter(r => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      r.room_name?.toLowerCase().includes(q) ||
-      r.room_code?.toLowerCase().includes(q) ||
-      r.host_user?.display_name?.toLowerCase().includes(q) ||
-      r.host_franchise?.toLowerCase().includes(q)
-    );
+  // FILTER RULES: Public Waiting Rooms (Lobby stage)
+  const publicWaitingRooms = publicRooms.filter(r => {
+    const isPublic = !r.is_private || r.is_private === 0;
+    return isPublic && r.status === 'LOBBY';
   });
 
   // Top Featured Room (Topmost active public live room)
@@ -280,16 +272,13 @@ export default function Home() {
       <div className="max-w-md md:max-w-lg mx-auto min-h-screen relative flex flex-col pb-24 px-4 pt-3">
         
         {/* ========================================================================= */}
-        {/* TOP HEADER (Exact Sketch: Logo + Cricket Auction / Live Match + Icons)    */}
+        {/* TOP HEADER: Logo text & status                                            */}
         {/* ========================================================================= */}
         <header className="flex justify-between items-center h-12 mb-3 pb-2 border-b border-[#1F2937]">
           <div 
             onClick={() => { setActiveTab('home'); window.scrollTo(0, 0); }}
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex items-center gap-2 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-md group-hover:border-[#10B981]/50 transition">
-              <CricketBatBallIcon size={18} color="#10B981" />
-            </div>
             <div>
               <span className="font-display font-extrabold text-base sm:text-lg tracking-tight leading-none block text-[#DFE2EF]">
                 Cricket Auction
@@ -306,17 +295,6 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <ServerHealthBadge compact />
             <button
-              onClick={() => setShowSearch(prev => !prev)}
-              className={`w-9 h-9 rounded-[6px] border transition flex items-center justify-center ${
-                showSearch 
-                  ? 'bg-[#10B981] text-[#090D16] border-[#10B981]' 
-                  : 'bg-[#111827] border-[#1F2937] text-[#86948A] hover:text-[#DFE2EF] hover:border-[#3C4A42]'
-              }`}
-              title="Search Live Rooms"
-            >
-              <Search size={16} />
-            </button>
-            <button
               onClick={() => { setActiveTab('profile'); window.scrollTo(0, 0); }}
               className={`w-9 h-9 rounded-[6px] border transition flex items-center justify-center ${
                 activeTab === 'profile' 
@@ -329,31 +307,6 @@ export default function Home() {
             </button>
           </div>
         </header>
-
-        {/* Collapsible Search Bar */}
-        {showSearch && (
-          <div className="mb-3 animate-fade-down">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#86948A]" />
-              <input
-                type="text"
-                placeholder="Search live playing teams, rooms, owners..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-[#111827] border border-[#1F2937] focus:border-[#10B981] rounded-[6px] pl-9 pr-8 py-2 text-xs text-[#DFE2EF] focus:outline-none font-sans placeholder-[#86948A]"
-                autoFocus
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#86948A] hover:text-white text-xs font-bold"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* ========================================================================= */}
         {/* TAB 1: HOME (Exact Match to User Hand-Drawn Sketch)                       */}
@@ -369,26 +322,43 @@ export default function Home() {
 
                 {/* Top Information Row */}
                 <div className="flex items-start justify-between mb-3 relative z-10">
-                  {/* Left: Red indicator + Live label + Auction Mode */}
+                  {/* Left: Indicator + Live/Paused label + Room Name */}
                   <div>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#EF4444] text-[11px] font-mono font-bold tracking-wider shadow-sm">
-                      <span className="w-2 h-2 rounded-full bg-[#EF4444] animate-ping inline-block"></span>
-                      <span>Live</span>
-                    </div>
+                    {featuredRoom.status === 'PAUSED' ? (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F59E0B]/15 border border-[#F59E0B]/40 text-[#F59E0B] text-[11px] font-mono font-bold tracking-wider shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-[#F59E0B] inline-block"></span>
+                        <span>Paused</span>
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#EF4444] text-[11px] font-mono font-bold tracking-wider shadow-sm">
+                        <span className="w-2 h-2 rounded-full bg-[#EF4444] animate-ping inline-block"></span>
+                        <span>Live</span>
+                      </div>
+                    )}
                     <div className="text-xs font-mono font-bold text-[#86948A] mt-1.5 tracking-tight">
-                      Mode : <span className="text-[#DFE2EF]">{featuredRoom.player_pool || 'IPL Auction 26'}</span>
+                      Room : <span className="text-[#DFE2EF] font-sans font-bold">{featuredRoom.room_name}</span> (#{featuredRoom.room_code})
                     </div>
                   </div>
 
-                  {/* Right: Spec Button + Team Availability */}
+                  {/* Right: Watch/Join Button + Team Availability */}
                   <div className="flex flex-col items-end gap-1">
-                    <button
-                      onClick={() => navigate(`/room/${featuredRoom.room_code}/auction?spectate=true`, { state: { spectator: true } })}
-                      className="px-3.5 py-1 rounded-[4px] bg-[#0F131C] border border-[#10B981] hover:bg-[#10B981] text-[#10B981] hover:text-[#090D16] font-display font-black text-xs uppercase tracking-wider transition active:scale-95 shadow-sm"
-                      title="Spectate Live Match"
-                    >
-                      Spec
-                    </button>
+                    {(featuredRoom.teams_count || 0) < (featuredRoom.max_teams || 10) ? (
+                      <button
+                        onClick={() => navigate(`/room/${featuredRoom.room_code}`)}
+                        className="px-3.5 py-1 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-black text-xs uppercase tracking-wider transition active:scale-95 shadow-sm cursor-pointer"
+                        title="Join Live Match"
+                      >
+                        Join
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => navigate(`/room/${featuredRoom.room_code}/auction?spectate=true`, { state: { spectator: true } })}
+                        className="px-3.5 py-1 rounded-[4px] bg-[#0F131C] border border-[#10B981] hover:bg-[#10B981] text-[#10B981] hover:text-[#090D16] font-display font-black text-xs uppercase tracking-wider transition active:scale-95 shadow-sm cursor-pointer"
+                        title="Watch Live Match"
+                      >
+                        Watch
+                      </button>
+                    )}
                     <span className="text-xs font-mono font-bold text-[#DFE2EF]">
                       {featuredRoom.teams_count || featuredRoom.participants?.length || 0}/{featuredRoom.max_teams || 10} Teams
                     </span>
@@ -488,38 +458,38 @@ export default function Home() {
               </div>
             )}
 
-            {/* B. LIVE MATCH ROOM LIST (Heading & Cards Matching Sketch) */}
+            {/* B. LIVE MATCH ROOM LIST */}
             <div className="space-y-2.5 pt-1">
               
-              {/* Headings: LIVE PLAYING TEAMS on Left, Team Avaliable on Right */}
               <div className="flex justify-between items-center px-1">
                 <h3 className="font-display font-extrabold text-xs uppercase tracking-wider text-[#86948A]">
-                  LIVE PLAYING TEAMS
+                  LIVE MATCHES ({publicLiveRooms.length})
                 </h3>
                 <span className="font-display font-bold text-xs text-[#86948A]">
                   Team Available
                 </span>
               </div>
 
-              {/* Room Cards List */}
               {roomsLoading && publicLiveRooms.length === 0 ? (
                 <div className="p-8 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
                   <RefreshCw size={20} className="animate-spin text-[#10B981] mx-auto mb-2" />
                   <span className="text-xs text-[#86948A] font-mono">Syncing active tournament rooms...</span>
                 </div>
-              ) : displayedLiveRooms.length === 0 ? (
+              ) : publicLiveRooms.length === 0 ? (
                 <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
                   <p className="text-xs text-[#86948A] font-mono">
-                    {searchQuery ? 'No rooms match your search query.' : 'No public live rooms active at this moment.'}
+                    No active live matches in progress right now.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {displayedLiveRooms.map((room, idx) => {
+                  {publicLiveRooms.map((room, idx) => {
                     const hostUser = room.host_user;
                     const hostAvatar = hostUser?.avatar_emoji;
                     const rawPurse = room.host_purse_lakhs || room.starting_purse_lakhs || 12000;
                     const purseText = `${(rawPurse / 100).toFixed(0)}cr`;
+                    const hasOpenSlot = (room.teams_count || 0) < (room.max_teams || 10);
+                    const isPaused = room.status === 'PAUSED';
 
                     return (
                       <div
@@ -528,12 +498,10 @@ export default function Home() {
                       >
                         {/* Left: Serial Number, Profile Icon, Room Info */}
                         <div className="flex items-center gap-3 min-w-0">
-                          {/* 1. Serial Number */}
                           <span className="font-mono text-xs font-bold text-[#86948A] w-5 text-center flex-shrink-0">
                             {idx + 1}
                           </span>
 
-                          {/* 2. Profile Icon */}
                           <div className="w-10 h-10 rounded-[4px] bg-[#0F131C] border border-[#1F2937] flex items-center justify-center flex-shrink-0 text-lg shadow-inner">
                             {hostAvatar ? (
                               <span>{hostAvatar}</span>
@@ -542,31 +510,45 @@ export default function Home() {
                             )}
                           </div>
 
-                          {/* 3. Room Information */}
                           <div className="min-w-0">
-                            <div className="text-xs font-display font-bold text-white truncate">
-                              Room Name : <span className="text-[#DFE2EF]">{room.room_name}</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-display font-bold text-white truncate">
+                                {room.room_name}
+                              </span>
+                              {isPaused ? (
+                                <span className="px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B] text-[10px] font-mono font-bold">PAUSED</span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-[#EF4444]/20 text-[#EF4444] text-[10px] font-mono font-bold">LIVE</span>
+                              )}
                             </div>
                             <div className="text-[11px] font-mono text-[#86948A] mt-0.5">
-                              Purse: <span className="text-[#10B981] font-bold">{purseText}</span>
+                              #{room.room_code} · Purse: <span className="text-[#10B981] font-bold">{purseText}</span>
                             </div>
                           </div>
                         </div>
 
-                        {/* Right: Spec Button and Team Availability */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          {/* 4. Spec Button */}
-                          <button
-                            onClick={() => navigate(`/room/${room.room_code}/auction?spectate=true`, { state: { spectator: true } })}
-                            className="px-3.5 py-1 rounded-[4px] bg-[#0F131C] border border-[#10B981] hover:bg-[#10B981] text-[#10B981] hover:text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer"
-                            title="Spectate Auction"
-                          >
-                            Spec
-                          </button>
+                        {/* Right: Watch/Join Button and Team Availability */}
+                        <div className="flex items-center gap-2.5 flex-shrink-0">
+                          {hasOpenSlot ? (
+                            <button
+                              onClick={() => navigate(`/room/${room.room_code}`)}
+                              className="px-3 py-1 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer"
+                              title="Join Room"
+                            >
+                              Join
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => navigate(`/room/${room.room_code}/auction?spectate=true`, { state: { spectator: true } })}
+                              className="px-3 py-1 rounded-[4px] bg-[#0F131C] border border-[#10B981] hover:bg-[#10B981] text-[#10B981] hover:text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer"
+                              title="Watch Auction"
+                            >
+                              Watch
+                            </button>
+                          )}
 
-                          {/* 5. Team Availability */}
-                          <span className="text-xs font-mono font-bold text-[#DFE2EF] min-w-[72px] text-right">
-                            {room.teams_count || room.participants?.length || 0}/{room.max_teams || 10} Teams
+                          <span className="text-xs font-mono font-bold text-[#DFE2EF] min-w-[65px] text-right">
+                            {room.teams_count || room.participants?.length || 0}/{room.max_teams || 10}
                           </span>
                         </div>
                       </div>
@@ -575,6 +557,83 @@ export default function Home() {
                 </div>
               )}
 
+            </div>
+
+            {/* C. WAITING FOR PLAYERS SECTION */}
+            <div className="space-y-2.5 pt-2">
+              <div className="flex justify-between items-center px-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display font-extrabold text-xs uppercase tracking-wider text-[#86948A]">
+                    WAITING FOR PLAYERS
+                  </h3>
+                  <span className="px-1.5 py-0.5 rounded-[4px] bg-[#10B981]/15 text-[#10B981] text-[10px] font-mono font-bold">
+                    {publicWaitingRooms.length} Open
+                  </span>
+                </div>
+                <button
+                  onClick={() => navigate('/create')}
+                  className="text-xs font-display font-bold text-[#10B981] hover:text-[#6FFBBE] transition cursor-pointer"
+                >
+                  ＋ Create Room
+                </button>
+              </div>
+
+              {publicWaitingRooms.length === 0 ? (
+                <div className="p-5 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
+                  <p className="text-xs text-[#86948A] font-mono mb-2">No public rooms currently waiting for players.</p>
+                  <button
+                    onClick={() => navigate('/create')}
+                    className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981] text-[#090D16] font-display font-bold text-xs uppercase tracking-wider hover:bg-[#6FFBBE] transition shadow cursor-pointer"
+                  >
+                    Host a Room Now
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {publicWaitingRooms.map((room) => {
+                    const hostUser = room.host_user;
+                    const hostName = hostUser?.display_name || room.host_id || 'Host';
+                    const filledSlots = room.teams_count || 0;
+                    const maxSlots = room.max_teams || 10;
+                    const isFull = filledSlots >= maxSlots;
+
+                    return (
+                      <div
+                        key={room.room_code}
+                        className="p-3 bg-[#111827] border border-[#1F2937] hover:border-[#10B981]/50 rounded-[6px] flex items-center justify-between gap-3 transition shadow-sm"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-display font-bold text-white truncate">
+                              {room.room_name}
+                            </span>
+                            <span className="font-mono text-[10px] font-bold text-[#10B981] bg-[#10B981]/10 px-1.5 py-0.5 rounded border border-[#10B981]/30">
+                              #{room.room_code}
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-mono text-[#86948A] mt-1">
+                            Host: <span className="text-[#DFE2EF] font-bold">{hostName}</span> · Slots: <span className="text-white font-bold">{filledSlots}/{maxSlots} Filled</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => navigate(`/room/${room.room_code}`)}
+                            disabled={isFull}
+                            className={`px-3.5 py-1.5 rounded-[4px] font-display font-bold text-xs uppercase tracking-wider transition ${
+                              isFull
+                                ? 'bg-[#1F2937] text-[#86948A] cursor-not-allowed'
+                                : 'bg-[#10B981] hover:bg-[#059669] text-[#090D16] shadow active:scale-95 cursor-pointer'
+                            }`}
+                          >
+                            {isFull ? 'Full' : 'Join Room'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
           </div>
@@ -587,18 +646,26 @@ export default function Home() {
           <div className="space-y-4 animate-fade-up">
             
             {/* Filter Pills */}
-            <div className="flex gap-2 mb-1">
+            <div className="flex gap-2 mb-1 overflow-x-auto">
               <button
                 onClick={() => setMatchesFilter('live')}
-                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition ${
+                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap ${
                   matchesFilter === 'live' ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
                 }`}
               >
                 Live Match Cards ({publicLiveRooms.length})
               </button>
               <button
+                onClick={() => setMatchesFilter('waiting')}
+                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap ${
+                  matchesFilter === 'waiting' ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
+                }`}
+              >
+                Waiting Rooms ({publicWaitingRooms.length})
+              </button>
+              <button
                 onClick={() => setMatchesFilter('brackets')}
-                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition ${
+                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap ${
                   matchesFilter === 'brackets' ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
                 }`}
               >
@@ -606,7 +673,7 @@ export default function Home() {
               </button>
               <button 
                 onClick={() => navigate('/create')} 
-                className="ml-auto text-xs bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 px-2.5 py-1.5 rounded-[4px] font-bold font-display hover:bg-[#10B981]/25 transition"
+                className="ml-auto text-xs bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 px-2.5 py-1.5 rounded-[4px] font-bold font-display hover:bg-[#10B981]/25 transition whitespace-nowrap"
               >
                 ＋ Host
               </button>
@@ -653,6 +720,49 @@ export default function Home() {
                           size="sm"
                         >
                           JOIN
+                        </GameButton>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* TAB: WAITING ROOMS */}
+            {matchesFilter === 'waiting' && (
+              <div className="space-y-2.5">
+                {publicWaitingRooms.length === 0 ? (
+                  <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
+                    <p className="text-xs text-[#86948A] mb-3 font-mono">No public rooms currently waiting for players.</p>
+                    <GameButton
+                      onClick={() => navigate('/create')}
+                      variant="primary"
+                      size="sm"
+                    >
+                      CREATE NEW ROOM
+                    </GameButton>
+                  </div>
+                ) : (
+                  publicWaitingRooms.map((r: any) => (
+                    <div 
+                      key={r.room_code}
+                      className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-[6px] hover:border-[#10B981]/40 transition flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-mono font-bold text-[#10B981] text-xs">#{r.room_code}</span>
+                          <span className="text-[10px] text-[#06B6D4] font-mono font-bold">● WAITING</span>
+                        </div>
+                        <h4 className="font-display font-bold text-sm text-[#DFE2EF]">{r.room_name}</h4>
+                        <span className="text-[11px] text-[#86948A] font-mono">Slots: {r.teams_count || 0}/{r.max_teams || 10} Filled · Purse: {formatCr(r.starting_purse_lakhs || 12000)}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <GameButton
+                          onClick={() => navigate(`/room/${r.room_code}`)}
+                          variant="primary"
+                          size="sm"
+                        >
+                          JOIN ROOM
                         </GameButton>
                       </div>
                     </div>

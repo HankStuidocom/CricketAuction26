@@ -8,6 +8,29 @@ export function getNextValidBid(currentBid: number): number {
   return currentBid + 50;
 }
 
+export function isValidLadderBid(currentBid: number, targetBid: number, basePrice: number): boolean {
+  if (targetBid <= 0) return false;
+
+  // Opening bid on fresh lot
+  if (currentBid === 0) {
+    if (targetBid === basePrice) return true;
+    if (targetBid < basePrice) return false;
+    let curr = basePrice;
+    while (curr < targetBid) {
+      curr = getNextValidBid(curr);
+    }
+    return curr === targetBid;
+  }
+
+  // Active lot bidding
+  if (targetBid <= currentBid) return false;
+  let curr = currentBid;
+  while (curr < targetBid) {
+    curr = getNextValidBid(curr);
+  }
+  return curr === targetBid;
+}
+
 export function processBid(roomCode: string, franchiseId: string, amount: number, idempotencyKey: string) {
   const tx = db.transaction(() => {
     const roomRow = db.prepare('SELECT * FROM rooms WHERE room_code = ?').get(roomCode) as unknown as Room | undefined;
@@ -23,12 +46,11 @@ export function processBid(roomCode: string, franchiseId: string, amount: number
       .get(roomRow.id, franchiseId) as unknown as RoomParticipant | undefined;
     if (!participantRow) throw new Error('Participant not in room');
 
-    const nextValidBid = roomRow.current_bid_lakhs === 0 ? 
-      (db.prepare('SELECT base_price_lakhs FROM players WHERE id = ?').get(roomRow.current_player_id) as any)?.base_price_lakhs || 50
-      : getNextValidBid(roomRow.current_bid_lakhs);
+    const basePrice = (db.prepare('SELECT base_price_lakhs FROM players WHERE id = ?').get(roomRow.current_player_id) as any)?.base_price_lakhs || 50;
+    const nextValidBid = roomRow.current_bid_lakhs === 0 ? basePrice : getNextValidBid(roomRow.current_bid_lakhs);
 
-    if (amount < nextValidBid || amount % 5 !== 0) {
-      throw new Error(`Invalid bid amount. Must be at least ${nextValidBid} Lakhs in 5L multiples.`);
+    if (amount < nextValidBid || !isValidLadderBid(roomRow.current_bid_lakhs, amount, basePrice)) {
+      throw new Error(`Invalid bid amount (₹${(amount / 100).toFixed(2)} Cr). Must be at least ₹${(nextValidBid / 100).toFixed(2)} Cr and conform to the official IPL increment ladder.`);
     }
     if (roomRow.current_bidder_franchise === franchiseId) throw new Error('Already the highest bidder');
 

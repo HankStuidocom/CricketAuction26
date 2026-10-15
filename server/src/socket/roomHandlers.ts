@@ -5,9 +5,8 @@ import { processAIBids, initializeAITeams } from '../services/aiBidding';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config';
 import { Room, RoomParticipant } from '../types';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret2026';
 
 export function buildFullRoomState(roomCode: string) {
   const normCode = (roomCode || '').trim().toUpperCase();
@@ -142,12 +141,14 @@ function checkHostAuthority(room: any, socket: Socket): boolean {
   const callerUserId = socket.data.userId;
   if (!callerUserId) return false;
   const isRegisteredHost = Boolean(db.prepare('SELECT id FROM users WHERE id = ?').get(room.host_id));
-  if (isRegisteredHost && room.host_id === callerUserId) {
-    if (socket.data.authUserId !== room.host_id) return false;
+  if (isRegisteredHost) {
+    return socket.data.authUserId === room.host_id;
   }
-  if (room.host_id === callerUserId) return true;
+  if (room.host_id === callerUserId) {
+    return Boolean(socket.data.isHost);
+  }
   const hostParticipant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, callerUserId) as any;
-  return Boolean(hostParticipant && hostParticipant.is_host);
+  return Boolean(hostParticipant && hostParticipant.is_host && socket.data.isHost);
 }
 
 export function setupSocketHandlers(io: Server) {
@@ -163,7 +164,7 @@ export function setupSocketHandlers(io: Server) {
     }
     
     socket.on('join_room', (data) => {
-      const { roomCode, userId, franchise, displayName, password, isSpectator, isManager } = data;
+      const { roomCode, userId, franchise, displayName, password, isSpectator, isManager, hostToken } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       
@@ -204,7 +205,33 @@ export function setupSocketHandlers(io: Server) {
         'SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?'
       ).get(room.id, effectiveUserId) as unknown as RoomParticipant | undefined;
 
-      const isHostUser = room.host_id === effectiveUserId;
+      let isHostUser = room.host_id === effectiveUserId;
+      if (isHostUser) {
+        if (isRegisteredHost) {
+          if (socket.data.authUserId !== room.host_id) {
+            isHostUser = false;
+          }
+        } else {
+          const providedToken = hostToken || socket.handshake.auth?.hostToken;
+          let validHostToken = false;
+          if (providedToken) {
+            try {
+              const decoded = jwt.verify(providedToken, JWT_SECRET) as any;
+              if (decoded && decoded.isHost && (decoded.roomCode === normalizedCode || decoded.roomId === room.id)) {
+                validHostToken = true;
+              }
+            } catch {
+              validHostToken = false;
+            }
+          }
+          if (!validHostToken) {
+            isHostUser = false;
+          }
+        }
+      }
+      if (isHostUser) {
+        socket.data.isHost = true;
+      }
 
       // RECONNECT CASE A: Commissioner reconnecting
       if (isHostUser && room.host_franchise === 'ADMIN') {

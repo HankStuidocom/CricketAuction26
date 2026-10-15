@@ -251,9 +251,6 @@ export default function Lobby() {
           </button>
 
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-inner">
-              <CricketBatBallIcon size={16} color="#10B981" />
-            </div>
             <span className="font-display font-bold text-lg tracking-tight text-white">
               CRICK<span className="text-[#10B981]">AUCTION</span>
             </span>
@@ -267,7 +264,7 @@ export default function Lobby() {
             <button
               onClick={copyCode}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111827] border border-[#10B981]/40 hover:border-[#10B981] rounded-[4px] text-xs font-mono font-bold text-[#10B981] transition shadow-sm"
-              title="Copy Arena Code"
+              title="Copy Room Code"
             >
               <span>#{code}</span>
               {copied ? <Check size={13} className="text-[#10B981]" /> : <Copy size={13} />}
@@ -294,20 +291,20 @@ export default function Lobby() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2 py-0.5 rounded-[4px] text-[10px] font-display font-bold bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 tracking-wider">
-                PRE-MATCH LOBBY
+                ROOM LOBBY
               </span>
               <h1 className="text-lg sm:text-xl font-display font-black text-white">
-                {room?.room_name || `Arena #${code}`}
+                {room?.room_name || `Room #${code}`}
               </h1>
               {isHost && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 text-[9px] font-mono font-bold uppercase">
-                  <CrownHostIcon size={11} color="#F59E0B" /> HOST COMMANDER
+                  <CrownHostIcon size={11} color="#F59E0B" /> HOST
                 </span>
               )}
             </div>
             <p className="text-xs text-[#86948A] mt-1">
               Starting Purse: <b className="text-[#10B981] font-mono">₹{(room?.starting_purse_lakhs || 12000) / 100} Cr</b>
-              {' · '}Max Squad: <b className="text-white font-mono">{room?.max_squad_size || 10}</b>
+              {' · '}Squad Size: <b className="text-white font-mono">{room?.min_squad_size || 5} - {room?.max_squad_size || 10}</b>
               {' · '}Teams: <b className="text-white font-mono">{participantCount}/{room?.max_teams || 10}</b>
             </p>
           </div>
@@ -419,14 +416,21 @@ export default function Lobby() {
 
                   {/* Badges */}
                   <div className="absolute top-2 right-2 flex gap-1">
-                    {isMyTeam && (
+                    {isMyTeam ? (
                       <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#10B981] text-[#090D16] uppercase tracking-wider">
-                        YOU
+                        PICKED
                       </span>
-                    )}
-                    {isAITeam && (
+                    ) : isTakenByOther ? (
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#EF4444]/15 text-[#FFB4AB] border border-[#EF4444]/30 uppercase tracking-wider">
+                        TAKEN
+                      </span>
+                    ) : isAITeam ? (
                       <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30 uppercase tracking-wider">
                         AI
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#86948A]/15 text-[#86948A] border border-[#1F2937] uppercase tracking-wider">
+                        OPEN
                       </span>
                     )}
                     {participant?.is_host && !isMyTeam && (
@@ -463,8 +467,11 @@ export default function Lobby() {
                        isMyTeam ? passedDisplayName :
                        'Open Slot'}
                     </div>
+                    <div className="text-[10px] text-[#86948A] font-mono mt-0.5">
+                      {participant?.squad_count || 0}/{room?.max_squad_size || 10} players
+                    </div>
                     {participant && !isOpen && (
-                      <div className="text-[10px] text-[#10B981] font-mono mt-1 font-bold">
+                      <div className="text-[10px] text-[#10B981] font-mono mt-0.5 font-bold">
                         {formatCr(participant.purse_remaining_lakhs)}
                       </div>
                     )}
@@ -476,7 +483,7 @@ export default function Lobby() {
 
           {isLobby && (
             <p className="text-[11px] text-[#86948A] text-center mt-2">
-              {isGameManager ? 'Game Manager mode: you oversee every franchise without owning a team.' : '💡 Click any open slot to switch your franchise before the auction starts · Teams lock when auction begins'}
+              {isGameManager ? 'Game Manager mode: you oversee every franchise without owning a team.' : '💡 Click any open slot to switch your team before the auction starts · Teams lock when auction begins'}
             </p>
           )}
         </div>
@@ -485,7 +492,7 @@ export default function Lobby() {
         <GamePanel noPadding className="mb-4">
           <div className="p-3 border-b border-[#1F2937] bg-[#181B25] flex items-center justify-between">
             <span className="text-xs font-display font-bold uppercase tracking-wider text-[#86948A] flex items-center gap-2">
-              <TacticalChatIcon size={14} color="#86948A" /> Arena Comms Relay
+              <TacticalChatIcon size={14} color="#86948A" /> Room Chat
             </span>
             <span className="text-[10px] text-[#86948A] font-mono">
               {chatMessages.length} Messages
@@ -494,7 +501,7 @@ export default function Lobby() {
 
           <div className="p-3 h-36 overflow-y-auto space-y-2 text-xs bg-[#0F131C]">
             <div className="text-xs text-[#86948A] italic">
-              Channel open. Coordinate tactics before live bidding commences.
+              Chat open. Discuss strategy before bidding begins.
             </div>
             {chatMessages.map((m, idx) => (
               <div key={idx} className="flex gap-2 items-baseline">
@@ -509,7 +516,7 @@ export default function Lobby() {
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Transmit tactical message..."
+              placeholder="Type a message..."
               className="flex-1 bg-[#0F131C] border border-[#1F2937] rounded-[4px] px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#10B981]"
             />
             <GameButton type="submit" variant="primary" size="sm">
@@ -533,7 +540,7 @@ export default function Lobby() {
             className="sm:w-auto px-8"
             icon={<PlayArrowIcon size={18} color="#090D16" />}
           >
-            COMMENCE LIVE BIDDING
+            START AUCTION
           </GameButton>
         </div>
       )}
@@ -541,7 +548,7 @@ export default function Lobby() {
       {!isHost && room && (
         <div className="mt-4 pt-3 border-t border-[#1F2937] text-center text-xs text-[#86948A] flex items-center justify-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping"></span>
-          <span>Awaiting host commander to commence live bidding stream...</span>
+          <span>Awaiting host to start the auction...</span>
         </div>
       )}
     </div>

@@ -139,7 +139,7 @@ export default function Results() {
         {championTeam && (
           <div className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F59E0B]/15 border border-[#F59E0B]/40 text-[#FFB95F] text-xs font-display font-bold">
             <CrownHostIcon size={14} color="#F59E0B" />
-            <span>Tournament Champion: {championTeam.display_name} ({championTeam.franchise_id}) — {championTeam.total_points} Rating Pts</span>
+            <span>Top Rated Squad: {championTeam.display_name} ({championTeam.franchise_id}) — {championTeam.total_points} Rating Pts</span>
           </div>
         )}
       </div>
@@ -497,10 +497,10 @@ export default function Results() {
             )}
           </div>
 
-          {/* Award: Tournament Champion */}
+          {/* Award: Top Rated Squad */}
           <div className="p-5 rounded-[6px] bg-[#111827] border border-[#F59E0B]/50 shadow-md">
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#F59E0B] flex items-center gap-2 mb-2">
-              <CrownHostIcon size={15} color="#F59E0B" /> TOURNAMENT CHAMPION
+              <CrownHostIcon size={15} color="#F59E0B" /> TOP RATED SQUAD
             </span>
             {championTeam ? (
               <div className="space-y-1">

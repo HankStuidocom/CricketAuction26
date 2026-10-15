@@ -32,6 +32,64 @@ import { sounds } from '../utils/sound';
 import CommissionerControlRoom from '../components/CommissionerControlRoom';
 import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
+function getNextLadderBid(current: number): number {
+  if (current < 100) return current + 10;
+  if (current < 500) return current + 25;
+  return current + 50;
+}
+
+function advanceLadderSteps(start: number, steps: number): number {
+  let curr = start;
+  for (let i = 0; i < steps; i++) {
+    curr = getNextLadderBid(curr);
+  }
+  return curr;
+}
+
+function getQuickBidOptions(currentBid: number, basePrice: number) {
+  const baseline = currentBid === 0 ? basePrice : currentBid;
+  if (baseline < 100) {
+    const b1 = advanceLadderSteps(baseline, 1);
+    const b2 = advanceLadderSteps(baseline, 2);
+    let b3 = baseline;
+    while (b3 < baseline + 50) {
+      b3 = getNextLadderBid(b3);
+    }
+    return [
+      { label: '+10 Lakh', target: b1 },
+      { label: '+20 Lakh', target: b2 },
+      { label: '+50 Lakh', target: b3 },
+    ];
+  } else if (baseline < 500) {
+    const b1 = advanceLadderSteps(baseline, 1);
+    const b2 = advanceLadderSteps(baseline, 2);
+    let b3 = baseline;
+    while (b3 < baseline + 100) {
+      b3 = getNextLadderBid(b3);
+    }
+    return [
+      { label: '+25 Lakh', target: b1 },
+      { label: '+50 Lakh', target: b2 },
+      { label: '+1 Crore', target: b3 },
+    ];
+  } else {
+    const b1 = advanceLadderSteps(baseline, 1);
+    let b2 = baseline;
+    while (b2 < baseline + 100) {
+      b2 = getNextLadderBid(b2);
+    }
+    let b3 = baseline;
+    while (b3 < baseline + 200) {
+      b3 = getNextLadderBid(b3);
+    }
+    return [
+      { label: '+50 Lakh', target: b1 },
+      { label: '+1 Crore', target: b2 },
+      { label: '+2 Crore', target: b3 },
+    ];
+  }
+}
+
 export default function LiveAuction() {
   const { code } = useParams();
   const navigate = useNavigate();
@@ -160,6 +218,17 @@ export default function LiveAuction() {
   const myPurse = myParticipant?.purse_remaining_lakhs || 0;
   const isInsufficientPurse = (myPurse - nextBidAmount) < requiredReserve;
 
+  const mySquad = myParticipant?.squad || [];
+  const battersCount = mySquad.filter((p: any) => p.primary_role === 'Batter').length;
+  const bowlersCount = mySquad.filter((p: any) => p.primary_role === 'Bowler').length;
+  const arCount = mySquad.filter((p: any) => p.primary_role === 'All-Rounder').length;
+  const wkCount = mySquad.filter((p: any) => p.primary_role === 'Wicket-Keeper').length;
+
+  const totalSpentLakhs = myParticipant?.total_spent_lakhs || 0;
+  const liveBidCommitment = isHighestBidder ? currentBid : 0;
+  const safeAvailableToBid = Math.max(0, myPurse - requiredReserve - liveBidCommitment);
+  const quickBidOptions = getQuickBidOptions(currentBid, activePlayerDetails?.base_price_lakhs || 50);
+
   let bidDisabledReason = '';
   if (isPaused) {
     bidDisabledReason = 'AUCTION PAUSED BY COMMISSIONER';
@@ -231,7 +300,7 @@ export default function LiveAuction() {
               <div className="text-[10px] font-bold text-[#86948A] uppercase tracking-wider font-mono flex items-center gap-2">
                 <span>ARENA #{code}</span>
                 {isSpectator && (
-                  <span className="px-1.5 py-0.2 rounded-[2px] bg-[#06B6D4]/20 text-[#06B6D4] text-[9px] font-bold font-mono tracking-wider">
+                  <span className="px-1.5 py-0.5 rounded-[2px] bg-[#06B6D4]/20 text-[#06B6D4] text-[10px] font-bold font-mono tracking-wider">
                     SPECTATOR
                   </span>
                 )}
@@ -313,7 +382,7 @@ export default function LiveAuction() {
           <div className="mb-4 p-3 rounded-[6px] bg-[#F59E0B]/15 border border-[#F59E0B]/50 flex items-center gap-2.5 shadow-lg">
             <Megaphone size={16} className="text-[#FFB95F] flex-shrink-0 animate-bounce" />
             <div className="flex-1">
-              <span className="text-[9px] font-mono font-bold text-[#FFB95F] uppercase tracking-wider block">
+              <span className="text-[10px] font-mono font-bold text-[#FFB95F] uppercase tracking-wider block">
                 COMMISSIONER OFFICIAL BULLETIN
               </span>
               <span className="text-xs font-bold text-white">
@@ -354,7 +423,7 @@ export default function LiveAuction() {
                     )}
                   </div>
                   <div>
-                    <span className="text-[9px] text-[#86948A] font-mono font-bold uppercase tracking-widest block">
+                    <span className="text-[10px] text-[#86948A] font-mono font-bold uppercase tracking-widest block">
                       Leading Bidder
                     </span>
                     <span className="font-['Outfit'] font-bold text-xs text-[#DFE2EF]" style={{ color: FRANCHISE_MAP[currentBidder]?.primary }}>
@@ -364,7 +433,7 @@ export default function LiveAuction() {
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[9px] text-[#86948A] font-mono font-bold uppercase tracking-widest block">
+                  <span className="text-[10px] text-[#86948A] font-mono font-bold uppercase tracking-widest block">
                     Current Amount
                   </span>
                   <span className="font-mono font-bold text-lg text-[#10B981]">
@@ -421,16 +490,10 @@ export default function LiveAuction() {
                 BID {formatCr(nextBidAmount)}
               </GameButton>
 
-              {/* Quick-Bid Jump Options */}
+              {/* Quick-Bid Jump Options (Strict Ladder Compliant) */}
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: '+25 Lakh', add: 25 },
-                  { label: '+50 Lakh', add: 50 },
-                  { label: '+1 Crore', add: 100 },
-                ].map((qb) => {
-                  const baseLotPrice = activePlayerDetails?.base_price_lakhs || 50;
-                  const currentBaseline = currentBid === 0 ? baseLotPrice : currentBid;
-                  const targetBid = currentBaseline + qb.add;
+                {quickBidOptions.map((qb) => {
+                  const targetBid = qb.target;
                   const canQuickBid = (myPurse - targetBid) >= requiredReserve && targetBid > currentBid && !isHighestBidder && !isPaused && !isSquadFull && !isOSLimitReached && !isSpectator && !isManager;
                   return (
                     <button
@@ -451,26 +514,48 @@ export default function LiveAuction() {
             </div>
           )}
 
-          {/* My Purse HUD Strip (Only if participant) */}
+          {/* Expanded Player Budget & Roster HUD (Only if participant) */}
           {!isSpectator && !isManager && myParticipant && (
-            <div className="mt-3 p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-[4px] bg-[#10B981]/15 flex items-center justify-center">
-                  <PurseCoinsIcon size={14} color="#10B981" />
+            <div className="mt-3 p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] space-y-2 text-xs shadow-md">
+              {/* Row 1: Capital & Commitment Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono">
+                <div className="p-2 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                  <span className="text-[10px] text-[#86948A] uppercase font-bold block">Remaining</span>
+                  <span className="font-bold text-sm text-[#10B981]">{formatCr(myPurse)}</span>
                 </div>
-                <div>
-                  <span className="text-[11px] text-[#86948A] font-mono uppercase font-bold block">Remaining Purse</span>
-                  <span className="font-mono font-bold text-sm text-[#DFE2EF]">
-                    {formatCr(myParticipant.purse_remaining_lakhs)}
+                <div className="p-2 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                  <span className="text-[10px] text-[#86948A] uppercase font-bold block">Spent</span>
+                  <span className="font-bold text-sm text-[#DFE2EF]">{formatCr(totalSpentLakhs)}</span>
+                </div>
+                <div className="p-2 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                  <span className="text-[10px] text-[#86948A] uppercase font-bold block">Committed</span>
+                  <span className={`font-bold text-sm ${isHighestBidder ? 'text-[#FFB95F]' : 'text-[#86948A]'}`}>
+                    {isHighestBidder ? formatCr(currentBid) : '₹0.00 Cr'}
                   </span>
+                </div>
+                <div className="p-2 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                  <span className="text-[10px] text-[#86948A] uppercase font-bold block">Safe Bid Cap</span>
+                  <span className="font-bold text-sm text-[#06B6D4]">{formatCr(safeAvailableToBid)}</span>
                 </div>
               </div>
 
-              <div className="text-right">
-                <span className="text-[11px] text-[#86948A] font-mono uppercase font-bold block">Squad Slots</span>
-                <span className="font-mono font-bold text-xs text-[#10B981]">
-                  {myParticipant.squad_count || 0} / {roomState?.max_squad_size || 10} Players
-                </span>
+              {/* Row 2: Squad Slots, Overseas Limit, & Role Breakdown */}
+              <div className="pt-2 border-t border-[#1F2937] flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono">
+                <div className="flex items-center gap-3">
+                  <span className="text-[#DFE2EF]">
+                    <span className="text-[#86948A]">Roster:</span> <b className="text-white">{currentSquadCount}</b>/{minRoster} min <span className="text-[#86948A]">({maxSquad} max)</span>
+                  </span>
+                  <span className="text-[#DFE2EF]">
+                    <span className="text-[#86948A]">Overseas:</span> <b className={osCount >= 4 ? 'text-[#FFB4AB]' : 'text-[#FFB95F]'}>{osCount}/4</b>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 rounded-[2px] bg-[#3B82F6]/15 text-[#93C5FD] border border-[#3B82F6]/30">BAT {battersCount}</span>
+                  <span className="px-1.5 py-0.5 rounded-[2px] bg-[#EF4444]/15 text-[#FCA5A5] border border-[#EF4444]/30">BOWL {bowlersCount}</span>
+                  <span className="px-1.5 py-0.5 rounded-[2px] bg-[#10B981]/15 text-[#6EE7B7] border border-[#10B981]/30">AR {arCount}</span>
+                  <span className="px-1.5 py-0.5 rounded-[2px] bg-[#F59E0B]/15 text-[#FCD34D] border border-[#F59E0B]/30">WK {wkCount}</span>
+                </div>
               </div>
             </div>
           )}
@@ -587,25 +672,25 @@ export default function LiveAuction() {
                     <div className="text-sm font-bold text-[#10B981]">
                       {roomState?.queue_summary?.find((q: any) => q.status === 'PENDING')?.count || 0}
                     </div>
-                    <div className="text-[8px] text-[#86948A]">UPCOMING</div>
+                    <div className="text-[10px] text-[#86948A]">UPCOMING</div>
                   </div>
                   <div className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
                     <div className="text-sm font-bold text-[#06B6D4]">
                       {roomState?.queue_summary?.find((q: any) => q.status === 'RELISTED')?.count || 0}
                     </div>
-                    <div className="text-[8px] text-[#86948A]">RELISTED</div>
+                    <div className="text-[10px] text-[#86948A]">RELISTED</div>
                   </div>
                   <div className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
                     <div className="text-sm font-bold text-[#FFB4AB]">
                       {roomState?.unsold_list?.length || roomState?.queue_summary?.find((q: any) => q.status === 'UNSOLD')?.count || 0}
                     </div>
-                    <div className="text-[8px] text-[#86948A]">UNSOLD</div>
+                    <div className="text-[10px] text-[#86948A]">UNSOLD</div>
                   </div>
                   <div className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
                     <div className="text-sm font-bold text-[#F59E0B]">
                       {roomState?.sold_list?.length || 0}
                     </div>
-                    <div className="text-[8px] text-[#86948A]">SOLD</div>
+                    <div className="text-[10px] text-[#86948A]">SOLD</div>
                   </div>
                 </div>
               </div>
@@ -716,7 +801,7 @@ export default function LiveAuction() {
                       {isManager && participant && !participant.is_ai && !participant.is_host && (
                         <button
                           onClick={() => kickPlayer(participant.user_id)}
-                          className="px-1.5 py-1 rounded-[3px] text-[9px] font-mono font-bold text-[#FFB4AB] border border-[#EF4444]/40 hover:bg-[#EF4444]/10"
+                          className="px-1.5 py-1 rounded-[3px] text-[10px] font-mono font-bold text-[#FFB4AB] border border-[#EF4444]/40 hover:bg-[#EF4444]/10"
                           title={`Hand ${f.id} to an AI bot`}
                         >
                           KICK
@@ -726,7 +811,7 @@ export default function LiveAuction() {
                         <div className="font-mono text-xs font-bold text-[#10B981]">
                           {formatCr(participant?.purse_remaining_lakhs ?? roomState?.starting_purse_lakhs ?? 12000)}
                         </div>
-                        <div className="text-[9px] text-[#86948A] uppercase font-mono font-medium">Purse</div>
+                        <div className="text-[10px] text-[#86948A] uppercase font-mono font-medium">Purse</div>
                       </div>
                     </div>
                   </div>

@@ -50,6 +50,7 @@ export interface Room {
   status: RoomStatus | string;
   max_teams: number;
   max_squad_size: number;
+  min_squad_size: number;
   starting_purse_lakhs: number;
   bid_timer_seconds: number;
   is_unlimited_timer: number;

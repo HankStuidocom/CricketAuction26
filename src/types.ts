@@ -55,6 +55,7 @@ export interface RoomSettings {
   is_private: boolean;
   max_teams: number;
   max_squad_size: number;
+  min_squad_size?: number;
   starting_purse_lakhs: number;
   bid_timer_seconds: number;
   is_unlimited_timer: boolean;
@@ -70,6 +71,8 @@ export interface RoomState {
   host_franchise: string;
   status: AuctionStatus;
   settings: RoomSettings;
+  max_squad_size?: number;
+  min_squad_size?: number;
   participants: Record<string, Participant>; // keyed by franchise_id
   current_player: Player | null;
   current_player_index: number;

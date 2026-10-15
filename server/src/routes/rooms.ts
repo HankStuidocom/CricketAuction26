@@ -3,12 +3,12 @@ import db from '../database/db';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../config';
 import { advanceToNextPlayer } from '../services/auctionEngine';
 import { emitRoomState, buildFullRoomState } from '../socket/roomHandlers';
 import { Room } from '../types';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret2026';
 
 // List public rooms (with optional live filter and full leaderboard/purse enrichment)
 router.get('/', (req, res) => {
@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
     const liveOnly = req.query.live === 'true' || req.query.status === 'IN_PROGRESS' || req.query.status === 'LIVE';
     let query = 'SELECT * FROM rooms WHERE is_private = 0';
     if (liveOnly) {
-      query += ' AND status IN ("IN_PROGRESS", "LIVE", "FINAL_ROUND")';
+      query += ' AND status IN ("IN_PROGRESS", "LIVE", "FINAL_ROUND", "PAUSED")';
     }
     query += ' ORDER BY created_at DESC LIMIT 50';
     const rooms = db.prepare(query).all() as any[];
@@ -95,13 +95,17 @@ router.post('/', (req, res) => {
       passwordHash = bcrypt.hashSync(roomConfig.password, 10);
     }
     
+    const maxTeams = (roomConfig && roomConfig.maxTeams) || 10;
+    const maxSquadSize = (roomConfig && roomConfig.maxSquadSize) || 10;
+    const minSquadSize = Math.min(maxSquadSize, Math.max(3, (roomConfig && roomConfig.minSquadSize) || 5));
+
     db.prepare(`
       INSERT INTO rooms (
         id, room_code, room_name, host_id, host_franchise,
         is_private, password_hash,
-        max_teams, max_squad_size, starting_purse_lakhs, bid_timer_seconds,
+        max_teams, max_squad_size, min_squad_size, starting_purse_lakhs, bid_timer_seconds,
         is_unlimited_timer, ai_enabled, ai_difficulty, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       roomId, 
       roomCode, 
@@ -110,8 +114,9 @@ router.post('/', (req, res) => {
       hostFranchise || 'CSK',
       roomConfig?.isPrivate ? 1 : 0,
       passwordHash,
-      (roomConfig && roomConfig.maxTeams) || 10, 
-      (roomConfig && roomConfig.maxSquadSize) || 25,
+      maxTeams, 
+      maxSquadSize,
+      minSquadSize,
       (roomConfig && roomConfig.startingPurse) || 12000, 
       (roomConfig && roomConfig.bidTimer) || 10,
       roomConfig?.isUnlimited ? 1 : 0,
@@ -149,7 +154,14 @@ router.post('/', (req, res) => {
     });
     tx();
 
-    res.json({ success: true, roomCode });
+    // Secure cryptographically-signed host token for the room creator
+    const hostToken = jwt.sign(
+      { hostId: hostId || 'guest-host', roomId, roomCode, isHost: true },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({ success: true, roomCode, roomId, hostToken });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -312,9 +324,10 @@ router.get('/:code/results', (req, res) => {
       };
     });
 
-    // Rank teams by total_points DESC, then purse_remaining_lakhs DESC
+    // Rank teams by total_points DESC, then avg_rating DESC, then purse_remaining_lakhs DESC
     teams.sort((a, b) => {
       if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      if (b.avg_rating !== a.avg_rating) return b.avg_rating - a.avg_rating;
       return b.purse_remaining_lakhs - a.purse_remaining_lakhs;
     });
 
@@ -336,7 +349,7 @@ router.get('/:code/results', (req, res) => {
     }
 
     const topSpender = [...teams].sort((a, b) => b.total_spent_lakhs - a.total_spent_lakhs)[0] || null;
-    const champion = teams[0] || null;
+    const topRatedSquad = teams[0] || null;
 
     const sanitizedRoom = { ...room };
     delete sanitizedRoom.password_hash;
@@ -345,11 +358,13 @@ router.get('/:code/results', (req, res) => {
       room: sanitizedRoom,
       players,
       teams,
-      champion,
+      topRatedSquad,
+      champion: topRatedSquad,
       awards: {
         topBuy,
         bestValue: bestValuePlayer,
-        topSpender
+        topSpender,
+        topRatedSquad
       },
       total_spent_lakhs: totalSpentLakhs,
       total_players_drafted: players.length

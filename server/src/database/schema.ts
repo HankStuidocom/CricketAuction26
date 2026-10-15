@@ -44,6 +44,7 @@ export function initializeDatabase() {
       status TEXT DEFAULT 'LOBBY',
       max_teams INTEGER DEFAULT 10,
       max_squad_size INTEGER DEFAULT 10,
+      min_squad_size INTEGER DEFAULT 5,
       starting_purse_lakhs INTEGER DEFAULT 12000,
       bid_timer_seconds INTEGER DEFAULT 10,
       is_unlimited_timer INTEGER DEFAULT 0,
@@ -125,4 +126,10 @@ export function initializeDatabase() {
       FOREIGN KEY (room_id) REFERENCES rooms(id)
     );
   `);
+
+  try {
+    db.exec('ALTER TABLE rooms ADD COLUMN min_squad_size INTEGER DEFAULT 5');
+  } catch {
+    // Column already exists
+  }
 }

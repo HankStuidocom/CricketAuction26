@@ -41,6 +41,7 @@ export default function CreateAuction() {
   const [password, setPassword] = useState('');
   const [maxTeams, setMaxTeams] = useState(10);
   const [maxSquadSize, setMaxSquadSize] = useState(10);
+  const [minSquadSize, setMinSquadSize] = useState(5);
   const [startingPurseCr, setStartingPurseCr] = useState(120);
   const [bidTimerSeconds, setBidTimerSeconds] = useState(10);
   const [isUnlimitedTimer, setIsUnlimitedTimer] = useState(false);
@@ -68,6 +69,7 @@ export default function CreateAuction() {
         password,
         maxTeams,
         maxSquadSize,
+        minSquadSize,
         poolSize: poolSizePreset === 'CUSTOM' ? customPoolSize : Number(poolSizePreset),
         startingPurse: startingPurseCr * 100, // into Lakhs
         bidTimer: bidTimerSeconds,
@@ -78,12 +80,16 @@ export default function CreateAuction() {
     };
 
     try {
-      const data = await safeFetch<{ success: boolean; roomCode: string }>('/api/rooms', {
+      const data = await safeFetch<{ success: boolean; roomCode: string; hostToken?: string }>('/api/rooms', {
         method: 'POST',
         body: JSON.stringify(payload),
         retries: 3,
         retryDelay: 3000
       });
+
+      if (data.hostToken) {
+        localStorage.setItem(`ca26_host_token_${data.roomCode}`, data.hostToken);
+      }
       
       saveRoomSession(data.roomCode, {
         franchise: selectedFranchise,
@@ -119,9 +125,6 @@ export default function CreateAuction() {
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-inner">
-            <CricketBatBallIcon size={16} color="#10B981" />
-          </div>
           <span className="font-display font-bold text-lg tracking-tight text-white">
             CRICK<span className="text-[#10B981]">AUCTION</span>
           </span>
@@ -133,7 +136,7 @@ export default function CreateAuction() {
         <ServerHealthBadge compact />
       </div>
 
-      {/* Tactical Step Progress Bar */}
+      {/* Step Progress Bar */}
       <div className="mb-6">
         <div className="flex items-center justify-between max-w-md mx-auto mb-4">
           <div className="flex items-center gap-2">
@@ -145,7 +148,7 @@ export default function CreateAuction() {
               1
             </span>
             <span className={`text-[11px] font-display font-bold uppercase tracking-wider ${step === 1 ? 'text-[#10B981]' : 'text-[#86948A]'}`}>
-              Franchise
+              Team
             </span>
           </div>
 
@@ -162,7 +165,7 @@ export default function CreateAuction() {
               2
             </span>
             <span className={`text-[11px] font-display font-bold uppercase tracking-wider ${step === 2 ? 'text-[#10B981]' : 'text-[#86948A]'}`}>
-              Rules
+              Settings
             </span>
           </div>
 
@@ -179,21 +182,21 @@ export default function CreateAuction() {
               3
             </span>
             <span className={`text-[11px] font-display font-bold uppercase tracking-wider ${step === 3 ? 'text-[#10B981]' : 'text-[#86948A]'}`}>
-              Deploy
+              Create
             </span>
           </div>
         </div>
 
         <div className="text-center sm:text-left">
           <h1 className="text-xl sm:text-2xl font-display font-black tracking-tight text-white uppercase">
-            {step === 1 && 'Select Tactical Franchise'}
-            {step === 2 && 'Tournament Parameters'}
-            {step === 3 && 'Auction Deployment'}
+            {step === 1 && 'Select Team'}
+            {step === 2 && 'Room Settings'}
+            {step === 3 && 'Review & Create'}
           </h1>
           <p className="text-xs text-[#86948A] mt-0.5">
-            {step === 1 && 'Choose a playing franchise, or enter as the non-playing Game Manager.'}
-            {step === 2 && 'Define starting purse, squad caps, countdown timers, and AI agents.'}
-            {step === 3 && 'Review your auction parameters and initialize the live room.'}
+            {step === 1 && 'Choose a playing team, or join as the non-playing Game Manager.'}
+            {step === 2 && 'Define starting purse, squad limits, timers, and AI teams.'}
+            {step === 3 && 'Review your auction settings and create the room.'}
           </p>
         </div>
       </div>
@@ -207,7 +210,7 @@ export default function CreateAuction() {
           <div className="flex items-center gap-2.5">
             <AlertCircle size={18} className={error.includes('waking up') || error.includes('sleep') ? 'text-[#10B981] flex-shrink-0' : 'text-[#EF4444] flex-shrink-0'} />
             <div>
-              <p className="font-bold">{error.includes('waking up') || error.includes('sleep') ? 'Server Spin-Up in Progress' : 'Deployment Notice'}</p>
+              <p className="font-bold">{error.includes('waking up') || error.includes('sleep') ? 'Server Spin-Up in Progress' : 'Notice'}</p>
               <p className="opacity-90 mt-0.5">{error}</p>
             </div>
           </div>
@@ -218,7 +221,7 @@ export default function CreateAuction() {
               disabled={loading}
               className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981] text-[#090D16] font-display font-bold text-xs uppercase tracking-wider hover:bg-[#6FFBBE] transition shadow flex-shrink-0"
             >
-              Retry Deploy Now
+              Retry Create Now
             </button>
           )}
         </div>
@@ -232,13 +235,13 @@ export default function CreateAuction() {
           <div className="p-5 sm:p-7 space-y-6">
             <div>
               <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
-                Commander Display Tag
+                Player Tag
               </label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Enter commander tag"
+                placeholder="Enter player tag"
                 className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-display font-bold"
               />
             </div>
@@ -328,7 +331,7 @@ export default function CreateAuction() {
                 size="md"
                 iconRight={<ChevronRight size={16} />}
               >
-                Continue: Parameters
+                Continue: Settings
               </GameButton>
             </div>
           </div>
@@ -340,7 +343,7 @@ export default function CreateAuction() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
-                  Arena Title
+                  Room Name
                 </label>
                 <input
                   type="text"
@@ -411,15 +414,38 @@ export default function CreateAuction() {
               </div>
 
               <div>
-                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2">
-                  Squad Roster Limit
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 flex items-center justify-between">
+                  <span>Min Squad Size</span>
+                  <span className="text-[#10B981] font-mono">{minSquadSize} Players</span>
                 </label>
                 <input
                   type="number"
-                  min={5}
+                  min={3}
+                  max={maxSquadSize}
+                  value={minSquadSize}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setMinSquadSize(Math.min(maxSquadSize, Math.max(3, val)));
+                  }}
+                  className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 flex items-center justify-between">
+                  <span>Max Squad Size</span>
+                  <span className="text-[#10B981] font-mono">{maxSquadSize} Players</span>
+                </label>
+                <input
+                  type="number"
+                  min={Math.max(5, minSquadSize)}
                   max={25}
                   value={maxSquadSize}
-                  onChange={(e) => setMaxSquadSize(Number(e.target.value))}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setMaxSquadSize(val);
+                    if (minSquadSize > val) setMinSquadSize(val);
+                  }}
                   className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold"
                 />
               </div>
@@ -562,13 +588,13 @@ export default function CreateAuction() {
                 size="md"
                 iconRight={<ChevronRight size={16} />}
               >
-                Review & Deploy
+                Review & Create
               </GameButton>
             </div>
           </div>
         )}
 
-        {/* STEP 3: REVIEW & LAUNCH */}
+        {/* STEP 3: REVIEW & CREATE */}
         {step === 3 && (
           <div className="p-5 sm:p-7 space-y-6">
             <div className="p-4 rounded-[6px] bg-[#181B25] border border-[#1F2937] flex items-center gap-4">
@@ -577,13 +603,13 @@ export default function CreateAuction() {
               </div>
               <div>
                 <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#10B981] block">
-                  {isGameManager ? 'NON-PLAYING ADMIN ROLE' : 'HOST FRANCHISE COMMAND'}
+                  {isGameManager ? 'NON-PLAYING ADMIN ROLE' : 'HOST TEAM'}
                 </span>
                 <h3 className="font-display font-black text-xl text-white">
                   {isGameManager ? 'Game Manager Console' : `${selectedTeamData.name} (${selectedTeamData.id})`}
                 </h3>
                 <p className="text-xs text-[#86948A]">
-                  Commander: <span className="text-[#DFE2EF] font-bold">{displayName}</span> · {isGameManager ? 'No team slot or bidding access' : 'Plays as a franchise'} · Arena: <span className="text-[#DFE2EF] font-bold">{roomName}</span>
+                  Player: <span className="text-[#DFE2EF] font-bold">{displayName}</span> · {isGameManager ? 'No team slot or bidding access' : 'Plays as a team'} · Room: <span className="text-[#DFE2EF] font-bold">{roomName}</span>
                 </p>
               </div>
             </div>
@@ -595,8 +621,8 @@ export default function CreateAuction() {
                 <p className="font-mono font-bold text-base text-[#10B981]">₹{startingPurseCr} Cr</p>
               </div>
               <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
-                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Roster Cap</span>
-                <p className="font-mono font-bold text-base text-white">{maxSquadSize} Players</p>
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Squad Limits</span>
+                <p className="font-mono font-bold text-base text-white">{minSquadSize} - {maxSquadSize} Players</p>
               </div>
               <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
                 <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Bid Timer</span>
@@ -605,8 +631,8 @@ export default function CreateAuction() {
                 </p>
               </div>
               <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
-                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Franchise Slots</span>
-                <p className="font-mono font-bold text-base text-white">{maxTeams} Slots</p>
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Max Teams</span>
+                <p className="font-mono font-bold text-base text-white">{maxTeams} Teams</p>
               </div>
             </div>
 
@@ -618,14 +644,16 @@ export default function CreateAuction() {
                 </p>
               </div>
               <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
-                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">AI Sub-agents</span>
+                <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">AI Teams</span>
                 <p className="font-display font-bold text-xs text-white">
                   {aiEnabled ? `🤖 Active (${aiDifficulty})` : 'Disabled'}
                 </p>
               </div>
               <div className="p-3 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
                 <span className="text-[10px] text-[#86948A] font-display font-bold block uppercase">Player Pool</span>
-                <p className="font-display font-bold text-xs text-white">IPL 2026 (250 Players)</p>
+                <p className="font-display font-bold text-xs text-white">
+                  {poolSizePreset === 'CUSTOM' ? `${customPoolSize} Players` : `${poolSizePreset} Players`}
+                </p>
               </div>
             </div>
 
@@ -649,7 +677,7 @@ export default function CreateAuction() {
                 size="lg"
                 icon={<GavelIcon size={18} color="#090D16" />}
               >
-                {loading ? 'CONNECTING & DEPLOYING...' : 'DEPLOY ARENA & OPEN LOBBY'}
+                {loading ? 'Creating Room...' : 'Create Room'}
               </GameButton>
             </div>
           </div>

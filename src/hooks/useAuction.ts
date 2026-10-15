@@ -18,8 +18,10 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     const savedSession = getRoomSession(roomCode || '');
     const effectivePassword = savedSession?.password;
 
+    const hostToken = localStorage.getItem(`ca26_host_token_${roomCode}`) || undefined;
+
     const newSocket = io(getSocketUrl(), {
-      auth: { token }
+      auth: { token, hostToken }
     });
 
     setSocket(newSocket);
@@ -33,7 +35,8 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
         franchise: isManager ? undefined : (currentFranchise || myFranchise),
         userId: myUserId || savedSession?.userId || 'guest-' + Math.random().toString(36).substring(7),
         displayName: savedSession?.displayName,
-        password: effectivePassword
+        password: effectivePassword,
+        hostToken
       });
     });
 
