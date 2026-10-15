@@ -53,8 +53,12 @@ router.get('/', (req, res) => {
       const leadingTeam = teamStats[0] || { franchise_id: room.host_franchise || 'CSK', points: 0 };
       const runnerUpTeam = teamStats[1] || (teamStats.length > 0 ? null : { franchise_id: 'GT', points: 0 });
 
+      const sanitizedRoom: any = { ...room };
+      delete sanitizedRoom.password_hash;
+      sanitizedRoom.has_password = Boolean(room.password_hash);
+
       return {
-        ...room,
+        ...sanitizedRoom,
         teams_count: teamsCount,
         host_user: host ? {
           username: host.username,
@@ -79,6 +83,7 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   const { roomConfig, hostFranchise, hostDisplayName, hostId } = req.body;
   try {
+    const isGameManager = hostFranchise === 'ADMIN';
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     const roomId = crypto.randomUUID();
     
@@ -112,24 +117,30 @@ router.post('/', (req, res) => {
       Date.now()
     );
 
-    // add host as participant
-    db.prepare(`
-      INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, joined_at)
-      VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-    `).run(crypto.randomUUID(), roomId, hostId || 'guest-host', hostFranchise || 'CSK', hostDisplayName || 'Host', (roomConfig && roomConfig.startingPurse) || 12000, Date.now());
+    // A Game Manager hosts the arena without occupying a franchise slot or purse.
+    // A normal host remains a playing franchise and keeps the existing host controls.
+    if (!isGameManager) {
+      db.prepare(`
+        INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, joined_at)
+        VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+      `).run(crypto.randomUUID(), roomId, hostId || 'guest-host', hostFranchise || 'CSK', hostDisplayName || 'Host', (roomConfig && roomConfig.startingPurse) || 12000, Date.now());
+    }
 
-    // Initialize auction queue
+    // Initialize auction queue with pool size support (Blitz: 40, Standard: 80, Mega: 250, or custom)
     const players = db.prepare('SELECT id FROM players WHERE auction_status = "Available"').all() as any[];
     // Shuffle
     players.sort(() => Math.random() - 0.5);
     
+    const poolLimit = Number(roomConfig?.poolSize);
+    const selectedPlayers = (poolLimit && poolLimit > 0) ? players.slice(0, poolLimit) : players;
+
     const insertQueue = db.prepare(`
       INSERT INTO auction_queue (id, room_id, player_id, queue_position)
       VALUES (?, ?, ?, ?)
     `);
     
     const tx = db.transaction(() => {
-      players.forEach((p, index) => {
+      selectedPlayers.forEach((p, index) => {
         insertQueue.run(crypto.randomUUID(), roomId, p.id, index);
       });
     });
@@ -180,8 +191,12 @@ router.get('/:code', (req, res) => {
       ORDER BY sp.sold_at DESC
     `).all(room.id);
 
+    const sanitizedRoom: any = { ...room };
+    delete sanitizedRoom.password_hash;
+    sanitizedRoom.has_password = Boolean(room.password_hash);
+
     res.json({
-      ...room,
+      ...sanitizedRoom,
       participants: enrichedParticipants,
       current_player: currentPlayer,
       sold_list: soldList

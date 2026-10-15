@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getSocketUrl } from '../lib/api';
 
-export function useAuction(roomCode: string, myFranchise?: string, myUserId?: string, isSpectator?: boolean) {
+export function useAuction(roomCode: string, myFranchise?: string, myUserId?: string, isSpectator?: boolean, isManager?: boolean) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [roomState, setRoomState] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+
+  const [announcements, setAnnouncements] = useState<any[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem('ca26_token');
@@ -24,6 +26,12 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
           roomCode,
           isSpectator: true,
           userId: myUserId || 'spectator-' + Math.random().toString(36).substring(7)
+        });
+      } else if (isManager) {
+        newSocket.emit('join_room', {
+          roomCode,
+          isManager: true,
+          userId: myUserId
         });
       } else {
         newSocket.emit('join_room', { 
@@ -51,6 +59,10 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
       setChatMessages((prev) => [...prev, msg]);
     });
 
+    newSocket.on('commissioner_announcement', (ann) => {
+      setAnnouncements((prev) => [ann, ...prev].slice(0, 5));
+    });
+
     newSocket.on('error', (err) => {
       setError(err.message || 'An error occurred');
     });
@@ -58,22 +70,51 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     return () => {
       newSocket.disconnect();
     };
-  }, [roomCode, myFranchise, myUserId]);
+  }, [roomCode, myFranchise, myUserId, isSpectator, isManager]);
 
   const placeBid = useCallback((amount?: number) => {
     if (socket && roomCode && myFranchise) {
       socket.emit('place_bid', {
         roomCode,
         franchise: myFranchise,
+        userId: myUserId,
         amount,
         idempotencyKey: `${roomCode}-${myFranchise}-${Date.now()}`
       });
     }
-  }, [socket, roomCode, myFranchise]);
+  }, [socket, roomCode, myFranchise, myUserId]);
 
-  const hostAction = useCallback((action: 'pause' | 'resume' | 'skip' | 'mark_unsold') => {
+  const hostAction = useCallback((action: 'pause' | 'resume' | 'skip' | 'mark_unsold' | 'relist_current') => {
     if (socket && roomCode && myUserId) {
       socket.emit(`host_${action}`, { roomCode, userId: myUserId });
+    }
+  }, [socket, roomCode, myUserId]);
+
+  const deferCurrentPlayer = useCallback(() => {
+    if (socket && roomCode && myUserId) {
+      socket.emit('host_defer_current', { roomCode, userId: myUserId });
+    }
+  }, [socket, roomCode, myUserId]);
+
+  const relistUnsoldPlayer = useCallback((playerId: string) => {
+    if (socket && roomCode && myUserId) {
+      socket.emit('host_relist_unsold_player', { roomCode, userId: myUserId, playerId });
+    }
+  }, [socket, roomCode, myUserId]);
+
+  const sendAnnouncement = useCallback((message: string) => {
+    if (socket && roomCode && myUserId) {
+      socket.emit('host_announcement', { roomCode, userId: myUserId, message });
+    }
+  }, [socket, roomCode, myUserId]);
+
+  const kickPlayer = useCallback((targetUserId: string) => {
+    if (socket && roomCode && myUserId) socket.emit('host_kick_player', { roomCode, userId: myUserId, targetUserId });
+  }, [socket, roomCode, myUserId]);
+
+  const updateAuctionSettings = useCallback((bidTimerSeconds: number, isUnlimitedTimer: boolean) => {
+    if (socket && roomCode && myUserId) {
+      socket.emit('host_update_settings', { roomCode, userId: myUserId, bidTimerSeconds, isUnlimitedTimer });
     }
   }, [socket, roomCode, myUserId]);
 
@@ -89,8 +130,15 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     error,
     connected,
     chatMessages,
+    announcements,
     placeBid,
     hostAction,
-    sendChat
+    deferCurrentPlayer,
+    relistUnsoldPlayer,
+    sendAnnouncement,
+    sendChat,
+    kickPlayer,
+    updateAuctionSettings
   };
 }
+

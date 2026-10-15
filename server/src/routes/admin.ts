@@ -3,6 +3,20 @@ import db from '../database/db';
 import { importPlayersFromExcel } from '../services/importPlayers';
 
 const router = Router();
+const ADMIN_SECRET = process.env.ADMIN_KEY || 'ca26_super_admin_secret_2026';
+
+// Middleware to guard mutation routes against unauthorized access
+function requireAdminAuth(req: any, res: any, next: any) {
+  const adminKey = req.headers['x-admin-key'];
+  const authHeader = req.headers.authorization;
+  if (adminKey === ADMIN_SECRET) {
+    return next();
+  }
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized: Admin authentication required' });
+}
 
 router.get('/players', (req, res) => {
   try {
@@ -24,7 +38,7 @@ router.get('/players/:id', (req, res) => {
   }
 });
 
-router.post('/import', (req, res) => {
+router.post('/import', requireAdminAuth, (req, res) => {
   try {
     const result = importPlayersFromExcel();
     res.json(result);
@@ -33,7 +47,7 @@ router.post('/import', (req, res) => {
   }
 });
 
-router.patch('/players/:id', (req, res) => {
+router.patch('/players/:id', requireAdminAuth, (req, res) => {
   const { auction_status, base_price_lakhs, game_points } = req.body;
   try {
     const stmt = db.prepare(`

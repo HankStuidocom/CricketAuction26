@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { warmupServer } from './lib/api';
 import Home from './pages/Home';
 import LiveAuction from './pages/LiveAuction';
 import CreateAuction from './pages/CreateAuction';
@@ -9,6 +10,9 @@ import Results from './pages/Results';
 import AuthPage from './pages/AuthPage';
 
 export default function App() {
+  useEffect(() => {
+    warmupServer();
+  }, []);
   return (
     <BrowserRouter>
       <Routes>

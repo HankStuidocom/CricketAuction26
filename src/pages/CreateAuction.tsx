@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ALL_FRANCHISES, getOrCreateUserId, saveRoomSession } from '../lib/utils';
-import { safeFetch } from '../lib/api';
+import { safeFetch, warmupServer } from '../lib/api';
 import GameButton from '../components/GameButton';
 import GamePanel from '../components/GamePanel';
 import { 
@@ -9,13 +9,19 @@ import {
   GavelIcon, 
   PrivateLockIcon, 
   BotsAiIcon, 
-  CheckmarkIcon 
+  CheckmarkIcon,
+  CrownHostIcon
 } from '../components/GameIcons';
 import { ArrowLeft, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
 
 export default function CreateAuction() {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
+
+  // Warmup backend server as soon as user opens Create Auction flow
+  useEffect(() => {
+    warmupServer();
+  }, []);
 
   // Step 1: Franchise & Display Name
   const [selectedFranchise, setSelectedFranchise] = useState('CSK');
@@ -37,6 +43,8 @@ export default function CreateAuction() {
   const [startingPurseCr, setStartingPurseCr] = useState(120);
   const [bidTimerSeconds, setBidTimerSeconds] = useState(10);
   const [isUnlimitedTimer, setIsUnlimitedTimer] = useState(false);
+  const [poolSizePreset, setPoolSizePreset] = useState<'40' | '80' | '250' | 'CUSTOM'>('250');
+  const [customPoolSize, setCustomPoolSize] = useState<number>(100);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
 
@@ -59,6 +67,7 @@ export default function CreateAuction() {
         password,
         maxTeams,
         maxSquadSize,
+        poolSize: poolSizePreset === 'CUSTOM' ? customPoolSize : Number(poolSizePreset),
         startingPurse: startingPurseCr * 100, // into Lakhs
         bidTimer: bidTimerSeconds,
         isUnlimited: isUnlimitedTimer,
@@ -70,7 +79,9 @@ export default function CreateAuction() {
     try {
       const data = await safeFetch<{ success: boolean; roomCode: string }>('/api/rooms', {
         method: 'POST',
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        retries: 3,
+        retryDelay: 3000
       });
       
       saveRoomSession(data.roomCode, {
@@ -91,6 +102,7 @@ export default function CreateAuction() {
   };
 
   const selectedTeamData = ALL_FRANCHISES.find(f => f.id === selectedFranchise) || ALL_FRANCHISES[0];
+  const isGameManager = selectedFranchise === 'ADMIN';
 
   return (
     <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] py-6 px-4 sm:px-6 max-w-5xl mx-auto font-sans">
@@ -178,7 +190,7 @@ export default function CreateAuction() {
             {step === 3 && 'Auction Deployment'}
           </h1>
           <p className="text-xs text-[#86948A] mt-0.5">
-            {step === 1 && 'Choose your franchise team to represent as team commander.'}
+            {step === 1 && 'Choose a playing franchise, or enter as the non-playing Game Manager.'}
             {step === 2 && 'Define starting purse, squad caps, countdown timers, and AI agents.'}
             {step === 3 && 'Review your auction parameters and initialize the live room.'}
           </p>
@@ -186,9 +198,28 @@ export default function CreateAuction() {
       </div>
 
       {error && (
-        <div className="mb-6 p-3.5 bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#FFB4AB] rounded-[6px] text-xs font-medium flex items-center gap-2">
-          <AlertCircle size={16} className="text-[#EF4444] flex-shrink-0" />
-          <span>{error}</span>
+        <div className={`mb-6 p-4 rounded-[6px] text-xs font-medium border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+          error.includes('waking up') || error.includes('sleep')
+            ? 'bg-[#10B981]/10 border-[#10B981]/40 text-[#6FFBBE]'
+            : 'bg-[#EF4444]/15 border-[#EF4444]/40 text-[#FFB4AB]'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            <AlertCircle size={18} className={error.includes('waking up') || error.includes('sleep') ? 'text-[#10B981] flex-shrink-0' : 'text-[#EF4444] flex-shrink-0'} />
+            <div>
+              <p className="font-bold">{error.includes('waking up') || error.includes('sleep') ? 'Server Spin-Up in Progress' : 'Deployment Notice'}</p>
+              <p className="opacity-90 mt-0.5">{error}</p>
+            </div>
+          </div>
+          {step === 3 && (
+            <button
+              type="button"
+              onClick={handleCreateRoom}
+              disabled={loading}
+              className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981] text-[#090D16] font-display font-bold text-xs uppercase tracking-wider hover:bg-[#6FFBBE] transition shadow flex-shrink-0"
+            >
+              Retry Deploy Now
+            </button>
+          )}
         </div>
       )}
 
@@ -213,11 +244,33 @@ export default function CreateAuction() {
 
             <div>
               <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-3 flex items-center justify-between">
-                <span>Select Franchise (Selected: {selectedTeamData.name})</span>
-                <span className="text-[#10B981] font-mono text-[11px]">10 AVAILABLE</span>
+                <span>Select Role {isGameManager ? '(Game Manager selected)' : `(Selected: ${selectedTeamData.name})`}</span>
+                <span className="text-[#10B981] font-mono text-[11px]">10 TEAMS + MANAGER</span>
               </label>
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedFranchise('ADMIN')}
+                  className={`group relative p-3 sm:p-4 rounded-[6px] border text-center transition-all flex flex-col items-center justify-between min-h-[145px] ${
+                    isGameManager
+                      ? 'border-[#F59E0B] bg-[#2A2114] shadow-[0_0_20px_rgba(245,158,11,0.22)]'
+                      : 'border-[#1F2937] bg-[#111827] hover:border-[#66523A] hover:bg-[#181B25]'
+                  }`}
+                >
+                  {isGameManager && (
+                    <div className="absolute top-2 right-2 w-4 h-4 rounded-[4px] bg-[#F59E0B] text-[#090D16] flex items-center justify-center shadow">
+                      <CheckmarkIcon size={10} color="#090D16" />
+                    </div>
+                  )}
+                  <div className="w-16 h-16 rounded-full border border-[#F59E0B]/50 bg-[#F59E0B]/10 flex items-center justify-center shadow-[inset_0_0_16px_rgba(245,158,11,0.12)]">
+                    <CrownHostIcon size={34} color="#F59E0B" />
+                  </div>
+                  <div className="w-full text-center mt-1">
+                    <div className="text-base font-display font-black tracking-wider leading-tight text-[#FFB95F]">ADMIN</div>
+                    <div className="text-[11px] text-[#86948A] font-medium mt-0.5">Game Manager</div>
+                  </div>
+                </button>
                 {ALL_FRANCHISES.map((team) => {
                   const isSelected = selectedFranchise === team.id;
                   return (
@@ -309,6 +362,51 @@ export default function CreateAuction() {
                   onChange={(e) => setStartingPurseCr(Number(e.target.value))}
                   className="w-full bg-[#0F131C] border border-[#1F2937] rounded-[6px] px-4 py-2.5 text-sm text-[#DFE2EF] focus:outline-none focus:border-[#10B981] font-mono font-bold"
                 />
+              </div>
+
+              {/* Player Pool Selection */}
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 flex items-center justify-between">
+                  <span>Player Pool Preset</span>
+                  <span className="text-[#10B981] font-mono font-bold">
+                    {poolSizePreset === 'CUSTOM' ? `${customPoolSize} Players` : `${poolSizePreset} Players`}
+                  </span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: '40', label: 'Blitz 40', sub: '~15 mins match' },
+                    { id: '80', label: 'Standard 80', sub: '~30 mins tournament' },
+                    { id: '250', label: 'Mega 250', sub: 'Full player pool' },
+                    { id: 'CUSTOM', label: 'Custom Pool', sub: 'Manual count' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setPoolSizePreset(preset.id as any)}
+                      className={`p-2.5 rounded-[6px] border text-left transition ${
+                        poolSizePreset === preset.id
+                          ? 'border-[#10B981] bg-[#10B981]/15 text-[#10B981] shadow-sm'
+                          : 'border-[#1F2937] bg-[#111827] text-[#86948A] hover:border-[#3C4A42]'
+                      }`}
+                    >
+                      <div className="font-display font-bold text-xs">{preset.label}</div>
+                      <div className="text-[10px] text-[#86948A] mt-0.5">{preset.sub}</div>
+                    </button>
+                  ))}
+                </div>
+                {poolSizePreset === 'CUSTOM' && (
+                  <div className="mt-2.5">
+                    <input
+                      type="number"
+                      min={10}
+                      max={250}
+                      value={customPoolSize}
+                      onChange={(e) => setCustomPoolSize(Number(e.target.value))}
+                      className="w-full bg-[#0F131C] border border-[#10B981]/50 rounded-[6px] px-3.5 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#10B981]"
+                      placeholder="Enter custom count (10-250)"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -474,21 +572,17 @@ export default function CreateAuction() {
           <div className="p-5 sm:p-7 space-y-6">
             <div className="p-4 rounded-[6px] bg-[#181B25] border border-[#1F2937] flex items-center gap-4">
               <div className="w-14 h-14 rounded-[4px] bg-[#111827] border border-[#1F2937] flex items-center justify-center p-2">
-                <img 
-                  src={selectedTeamData.logoUrl} 
-                  alt={selectedTeamData.name} 
-                  className="max-h-full object-contain drop-shadow" 
-                />
+                {isGameManager ? <CrownHostIcon size={32} color="#F59E0B" /> : <img src={selectedTeamData.logoUrl} alt={selectedTeamData.name} className="max-h-full object-contain drop-shadow" />}
               </div>
               <div>
                 <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#10B981] block">
-                  HOST FRANCHISE COMMAND
+                  {isGameManager ? 'NON-PLAYING ADMIN ROLE' : 'HOST FRANCHISE COMMAND'}
                 </span>
                 <h3 className="font-display font-black text-xl text-white">
-                  {selectedTeamData.name} ({selectedTeamData.id})
+                  {isGameManager ? 'Game Manager Console' : `${selectedTeamData.name} (${selectedTeamData.id})`}
                 </h3>
                 <p className="text-xs text-[#86948A]">
-                  Commander: <span className="text-[#DFE2EF] font-bold">{displayName}</span> · Arena: <span className="text-[#DFE2EF] font-bold">{roomName}</span>
+                  Commander: <span className="text-[#DFE2EF] font-bold">{displayName}</span> · {isGameManager ? 'No team slot or bidding access' : 'Plays as a franchise'} · Arena: <span className="text-[#DFE2EF] font-bold">{roomName}</span>
                 </p>
               </div>
             </div>
@@ -554,7 +648,7 @@ export default function CreateAuction() {
                 size="lg"
                 icon={<GavelIcon size={18} color="#090D16" />}
               >
-                DEPLOY ARENA & OPEN LOBBY
+                {loading ? 'CONNECTING & DEPLOYING...' : 'DEPLOY ARENA & OPEN LOBBY'}
               </GameButton>
             </div>
           </div>

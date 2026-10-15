@@ -27,8 +27,9 @@ import {
   CloseIcon,
   TrophyCupIcon
 } from '../components/GameIcons';
-import { AlertCircle, LogOut, Eye, ArrowLeft } from 'lucide-react';
+import { AlertCircle, LogOut, Eye, ArrowLeft, Megaphone } from 'lucide-react';
 import { sounds } from '../utils/sound';
+import CommissionerControlRoom from '../components/CommissionerControlRoom';
 
 export default function LiveAuction() {
   const { code } = useParams();
@@ -43,12 +44,29 @@ export default function LiveAuction() {
   const myDisplayName = location.state?.displayName || savedSession.displayName || (isSpectator ? 'Spectator' : 'Player');
   const myUserId = location.state?.userId || savedSession.userId || getOrCreateUserId();
 
-  const { roomState, error, connected, chatMessages, placeBid, hostAction, sendChat } = useAuction(code || '', myFranchise, myUserId, isSpectator);
+  const isManager = location.state?.manager === true || myFranchise === 'ADMIN';
+  const { 
+    roomState, 
+    error, 
+    connected, 
+    chatMessages, 
+    announcements,
+    placeBid, 
+    hostAction, 
+    deferCurrentPlayer,
+    relistUnsoldPlayer, 
+    sendAnnouncement,
+    sendChat, 
+    kickPlayer, 
+    updateAuctionSettings 
+  } = useAuction(code || '', myFranchise, myUserId, isSpectator, isManager);
 
   const [timeLeft, setTimeLeft] = useState(0);
-  const [activeTab, setActiveTab] = useState<'teams' | 'chat'>('teams');
+  const [activeTab, setActiveTab] = useState<'teams' | 'chat' | 'manager'>('teams');
   const [chatInput, setChatInput] = useState('');
   const [activePlayerDetails, setActivePlayerDetails] = useState<any>(null);
+  const [managerTimer, setManagerTimer] = useState(10);
+  const [managerUnlimited, setManagerUnlimited] = useState(false);
 
   // Sync deadline timer
   useEffect(() => {
@@ -86,6 +104,13 @@ export default function LiveAuction() {
   const isPaused = roomState?.status === 'PAUSED';
   const isHost = roomState?.host_id === myUserId;
 
+  useEffect(() => {
+    if (roomState) {
+      setManagerTimer(roomState.bid_timer_seconds || 10);
+      setManagerUnlimited(Boolean(roomState.is_unlimited_timer));
+    }
+  }, [roomState?.bid_timer_seconds, roomState?.is_unlimited_timer]);
+
   // Calculate next bid
   const nextBidAmount = currentBid === 0 
     ? (activePlayerDetails?.base_price_lakhs || 50)
@@ -105,6 +130,72 @@ export default function LiveAuction() {
 
   const myParticipant = roomState?.participants?.find((p: any) => p.franchise_id === myFranchise);
   const myTeamData = FRANCHISE_MAP[myFranchise] || ALL_FRANCHISES[0];
+
+  const currentSquadCount = myParticipant?.squad_count || 0;
+  const maxSquad = roomState?.max_squad_size || 10;
+  const isSquadFull = currentSquadCount >= maxSquad;
+
+  const osCount = myParticipant?.squad?.filter((s: any) => s.status === 'OS').length || 0;
+  const isOverseasPlayer = activePlayerDetails?.status === 'OS';
+  const isOSLimitReached = isOverseasPlayer && osCount >= 4;
+
+  const minBasePrice = 50; // ₹0.5 Cr
+  const slotsRemainingAfterThis = Math.max(0, maxSquad - currentSquadCount - 1);
+  const requiredReserve = slotsRemainingAfterThis * minBasePrice;
+  const myPurse = myParticipant?.purse_remaining_lakhs || 0;
+  const isInsufficientPurse = (myPurse - nextBidAmount) < requiredReserve;
+
+  let bidDisabledReason = '';
+  if (isPaused) {
+    bidDisabledReason = 'AUCTION PAUSED BY COMMISSIONER';
+  } else if (!activePlayerDetails) {
+    bidDisabledReason = 'WAITING FOR NEXT LOT...';
+  } else if (isHighestBidder) {
+    bidDisabledReason = 'YOU HOLD THE HIGHEST BID';
+  } else if (isSquadFull) {
+    bidDisabledReason = `SQUAD FULL (${currentSquadCount}/${maxSquad} ROSTER CAP)`;
+  } else if (isOSLimitReached) {
+    bidDisabledReason = `MAX OVERSEAS REACHED (4/4 OS CAP)`;
+  } else if (isInsufficientPurse) {
+    bidDisabledReason = `INSUFFICIENT PURSE (Need min ${formatCr(requiredReserve + nextBidAmount)})`;
+  }
+
+  const canPlaceBid = !bidDisabledReason && !isSpectator && !isManager;
+
+  // Dedicated Commissioner Layout for Game Manager
+  if (isManager) {
+    return (
+      <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] p-4 sm:p-6 font-['Inter',sans-serif] relative overflow-x-hidden">
+        {/* Stadium Spotlight Background Mesh */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#F59E0B]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-[#06B6D4]/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-6xl mx-auto w-full relative z-10">
+          <CommissionerControlRoom
+            code={code || ''}
+            roomState={roomState}
+            myUserId={myUserId}
+            myDisplayName={myDisplayName}
+            timeLeft={timeLeft}
+            isPaused={isPaused}
+            activePlayerDetails={activePlayerDetails}
+            currentBid={currentBid}
+            currentBidder={currentBidder}
+            hostAction={hostAction}
+            deferCurrentPlayer={deferCurrentPlayer}
+            relistUnsoldPlayer={relistUnsoldPlayer}
+            sendAnnouncement={sendAnnouncement}
+            kickPlayer={kickPlayer}
+            updateAuctionSettings={updateAuctionSettings}
+            announcements={announcements}
+            chatMessages={chatMessages}
+            sendChat={sendChat}
+            onNavigateResults={() => navigate(`/room/${code}/results`)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] flex flex-col md:flex-row font-['Inter',sans-serif] relative overflow-x-hidden">
@@ -134,6 +225,13 @@ export default function LiveAuction() {
                   <span className="text-[#06B6D4] flex items-center gap-1.5 text-xs sm:text-sm font-semibold">
                     <Eye size={14} className="text-[#06B6D4]" /> Live Spectator Stream
                   </span>
+                ) : isManager ? (
+                  <>
+                    <CrownHostIcon size={17} color="#F59E0B" />
+                    <span className="text-[#FFB95F]">GAME MANAGER</span>
+                    <span className="text-[#86948A]/40">|</span>
+                    <span className="text-xs font-bold text-[#86948A]">{myDisplayName}</span>
+                  </>
                 ) : (
                   <>
                     {myTeamData.logoUrl ? (
@@ -192,6 +290,21 @@ export default function LiveAuction() {
             )}
           </div>
         </div>
+
+        {/* Official Commissioner Bulletin Banner */}
+        {announcements && announcements.length > 0 && (
+          <div className="mb-4 p-3 rounded-[6px] bg-[#F59E0B]/15 border border-[#F59E0B]/50 flex items-center gap-2.5 shadow-lg">
+            <Megaphone size={16} className="text-[#FFB95F] flex-shrink-0 animate-bounce" />
+            <div className="flex-1">
+              <span className="text-[9px] font-mono font-bold text-[#FFB95F] uppercase tracking-wider block">
+                COMMISSIONER OFFICIAL BULLETIN
+              </span>
+              <span className="text-xs font-bold text-white">
+                {announcements[0]?.message}
+              </span>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-500/15 border border-red-500/30 text-red-300 rounded-[4px] text-xs font-bold flex items-center gap-2">
@@ -264,25 +377,63 @@ export default function LiveAuction() {
                 YOU HOLD THE HIGHEST BID ({formatCr(currentBid)})
               </span>
               <span className="text-[10px] text-[#86948A] font-mono mt-0.5 block">
-                Waiting for rivals to counter-bid
+                Waiting for rival franchise counters
+              </span>
+            </div>
+          ) : bidDisabledReason ? (
+            <div className="w-full py-3.5 px-5 rounded-[6px] bg-[#181B25] border border-[#EF4444]/40 text-center shadow-inner">
+              <span className="font-['Outfit'] font-bold text-xs sm:text-sm text-[#FFB4AB] flex items-center justify-center gap-2 uppercase tracking-wide">
+                <AlertCircle size={15} className="text-[#EF4444]" />
+                {bidDisabledReason}
+              </span>
+              <span className="text-[10px] text-[#86948A] font-mono mt-0.5 block">
+                Tournament rules require squad reserve & overseas limits
               </span>
             </div>
           ) : (
-            <GameButton
-              onClick={handlePlaceBid}
-              disabled={isPaused || !activePlayerDetails}
-              variant="primary"
-              size="xl"
-              fullWidth
-              className="py-4 shadow-[0_0_24px_rgba(16,185,129,0.35)]"
-              icon={<GavelIcon size={20} color="#090D16" />}
-            >
-              BID {formatCr(nextBidAmount)}
-            </GameButton>
+            <div className="space-y-2">
+              <GameButton
+                onClick={handlePlaceBid}
+                disabled={!canPlaceBid}
+                variant="primary"
+                size="xl"
+                fullWidth
+                className="py-4 shadow-[0_0_24px_rgba(16,185,129,0.35)]"
+                icon={<GavelIcon size={20} color="#090D16" />}
+              >
+                BID {formatCr(nextBidAmount)}
+              </GameButton>
+
+              {/* Quick-Bid Jump Options */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: '+25 Lakh', add: 25 },
+                  { label: '+50 Lakh', add: 50 },
+                  { label: '+1 Crore', add: 100 },
+                ].map((qb) => {
+                  const targetBid = (currentBid || activePlayerDetails?.base_price_lakhs || 50) + qb.add;
+                  const canQuickBid = (myPurse - targetBid) >= requiredReserve;
+                  return (
+                    <button
+                      key={qb.label}
+                      type="button"
+                      disabled={!canQuickBid}
+                      onClick={() => {
+                        sounds.playBid();
+                        placeBid(targetBid);
+                      }}
+                      className="py-1.5 px-2 rounded-[4px] bg-[#111827] hover:bg-[#1C1F29] border border-[#1F2937] hover:border-[#10B981]/50 text-center text-xs font-mono font-bold text-[#10B981] disabled:opacity-40 transition active:scale-95"
+                    >
+                      {qb.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* My Purse HUD Strip (Only if participant) */}
-          {!isSpectator && myParticipant && (
+          {!isSpectator && !isManager && myParticipant && (
             <div className="mt-3 p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-[4px] bg-[#10B981]/15 flex items-center justify-center">
@@ -319,7 +470,7 @@ export default function LiveAuction() {
                 AUCTIONEER COMMAND DECK
               </div>
 
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 <button
                   onClick={() => hostAction(isPaused ? 'resume' : 'pause')}
                   className="p-2 bg-[#0F131C] hover:bg-[#1A2234] rounded-[4px] text-[10px] font-bold font-['Outfit'] flex flex-col items-center gap-1 border border-[#1F2937] hover:border-[#10B981] text-[#DFE2EF] transition active:scale-95"
@@ -345,6 +496,15 @@ export default function LiveAuction() {
                 </button>
 
                 <button
+                  onClick={() => hostAction('relist_current')}
+                  className="p-2 bg-[#0F131C] hover:bg-[#1A2234] rounded-[4px] text-[10px] font-bold font-['Outfit'] flex flex-col items-center gap-1 border border-[#06B6D4]/40 text-[#8BE9FD] transition active:scale-95"
+                  title="Move this player to the final upcoming round"
+                >
+                  <FastForwardIcon size={14} color="#06B6D4" />
+                  <span>Relist</span>
+                </button>
+
+                <button
                   onClick={() => navigate(`/room/${code}/results`)}
                   className="p-2 bg-[#0F131C] hover:bg-[#1A2234] rounded-[4px] text-[10px] font-bold font-['Outfit'] flex flex-col items-center gap-1 border border-[#F59E0B]/40 text-[#FFB95F] transition active:scale-95"
                 >
@@ -352,6 +512,13 @@ export default function LiveAuction() {
                   <span>Results</span>
                 </button>
               </div>
+              {isManager && (
+                <div className="mt-3 pt-3 border-t border-[#1F2937] flex items-center gap-2">
+                  <input type="number" min="5" max="120" value={managerTimer} onChange={(e) => setManagerTimer(Number(e.target.value))} disabled={managerUnlimited} className="w-16 bg-[#0F131C] border border-[#1F2937] rounded-[4px] px-2 py-1.5 text-xs font-mono text-[#DFE2EF]" />
+                  <label className="flex items-center gap-1.5 text-[10px] font-mono text-[#86948A]"><input type="checkbox" checked={managerUnlimited} onChange={(e) => setManagerUnlimited(e.target.checked)} /> Unlimited</label>
+                  <button onClick={() => updateAuctionSettings(managerTimer, managerUnlimited)} className="ml-auto text-[10px] font-mono font-bold text-[#10B981] hover:text-[#6FFBBE]">APPLY TIMER</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -373,7 +540,117 @@ export default function LiveAuction() {
             >
               Arena Comms
             </button>
+            {(isHost || isManager) && (
+              <button
+                onClick={() => setActiveTab('manager')}
+                className={`pb-2 px-3 border-b-2 uppercase tracking-wider transition flex items-center gap-1.5 ${
+                  activeTab === 'manager' ? 'border-[#F59E0B] text-[#FFB95F]' : 'border-transparent text-[#86948A] hover:text-[#FFB95F]'
+                }`}
+              >
+                <CrownHostIcon size={12} color={activeTab === 'manager' ? '#FFB95F' : '#86948A'} />
+                Manager Deck
+              </button>
+            )}
           </div>
+
+          {/* TAB 3: Manager Deck & Queue Inspector */}
+          {activeTab === 'manager' && (
+            <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 text-xs">
+              {/* Queue status breakdown */}
+              <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px]">
+                <div className="text-[10px] font-mono font-bold uppercase text-[#86948A] mb-2 flex items-center justify-between">
+                  <span>AUCTION LOT BREAKDOWN</span>
+                  <span className="text-[#FFB95F] font-bold">MANAGER AUTHORITY</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1 text-center font-mono">
+                  <div className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                    <div className="text-sm font-bold text-[#10B981]">
+                      {roomState?.queue_summary?.find((q: any) => q.status === 'PENDING')?.count || 0}
+                    </div>
+                    <div className="text-[8px] text-[#86948A]">UPCOMING</div>
+                  </div>
+                  <div className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                    <div className="text-sm font-bold text-[#06B6D4]">
+                      {roomState?.queue_summary?.find((q: any) => q.status === 'RELISTED')?.count || 0}
+                    </div>
+                    <div className="text-[8px] text-[#86948A]">RELISTED</div>
+                  </div>
+                  <div className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                    <div className="text-sm font-bold text-[#FFB4AB]">
+                      {roomState?.unsold_list?.length || roomState?.queue_summary?.find((q: any) => q.status === 'UNSOLD')?.count || 0}
+                    </div>
+                    <div className="text-[8px] text-[#86948A]">UNSOLD</div>
+                  </div>
+                  <div className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937]">
+                    <div className="text-sm font-bold text-[#F59E0B]">
+                      {roomState?.sold_list?.length || 0}
+                    </div>
+                    <div className="text-[8px] text-[#86948A]">SOLD</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Unsold Category */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="font-['Outfit'] font-bold text-[11px] uppercase tracking-wider text-[#FFB4AB] flex items-center gap-1.5">
+                    <CloseIcon size={12} color="#FFB4AB" /> Unsold Players Pool ({roomState?.unsold_list?.length || 0})
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
+                  {(!roomState?.unsold_list || roomState.unsold_list.length === 0) ? (
+                    <div className="p-2.5 bg-[#0F131C] border border-[#1F2937] rounded-[4px] text-center text-[#86948A] italic text-[11px]">
+                      No unsold players yet.
+                    </div>
+                  ) : (
+                    roomState.unsold_list.map((pl: any) => (
+                      <div key={pl.player_id} className="p-2 rounded-[4px] bg-[#111827] border border-[#1F2937] flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-white text-xs">{pl.player_name}</div>
+                          <div className="text-[10px] text-[#86948A] font-mono">
+                            {pl.primary_role} · {pl.country} · {formatCr(pl.base_price_lakhs)}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => relistUnsoldPlayer(pl.player_id)}
+                          className="px-2 py-1 rounded-[3px] bg-[#06B6D4]/15 border border-[#06B6D4]/40 hover:bg-[#06B6D4]/30 text-[#8BE9FD] text-[10px] font-mono font-bold transition"
+                          title="Move player to final upcoming round"
+                        >
+                          + UPCOMING
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Upcoming players preview */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="font-['Outfit'] font-bold text-[11px] uppercase tracking-wider text-[#86948A]">
+                    Next In Line (Preview)
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto font-mono text-[11px]">
+                  {(!roomState?.upcoming_list || roomState.upcoming_list.length === 0) ? (
+                    <div className="p-2.5 bg-[#0F131C] border border-[#1F2937] rounded-[4px] text-center text-[#86948A] italic">
+                      Queue finished or loading...
+                    </div>
+                  ) : (
+                    roomState.upcoming_list.slice(0, 5).map((u: any, idx: number) => (
+                      <div key={u.player_id} className="p-1.5 rounded-[4px] bg-[#0F131C] border border-[#1F2937] flex items-center justify-between">
+                        <span className="text-[#86948A]">#{idx + 1} {u.player_name}</span>
+                        <span className={u.status === 'RELISTED' ? 'text-[#06B6D4] font-bold' : 'text-[#10B981]'}>
+                          {u.status === 'RELISTED' ? 'RELIST' : formatCr(u.base_price_lakhs)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* TAB 1: Teams Overview */}
           {activeTab === 'teams' && (
@@ -415,11 +692,22 @@ export default function LiveAuction() {
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="font-mono text-xs font-bold text-[#10B981]">
-                        {formatCr(participant?.purse_remaining_lakhs ?? roomState?.starting_purse_lakhs ?? 12000)}
+                    <div className="text-right flex items-center gap-2">
+                      {isManager && participant && !participant.is_ai && !participant.is_host && (
+                        <button
+                          onClick={() => kickPlayer(participant.user_id)}
+                          className="px-1.5 py-1 rounded-[3px] text-[9px] font-mono font-bold text-[#FFB4AB] border border-[#EF4444]/40 hover:bg-[#EF4444]/10"
+                          title={`Hand ${f.id} to an AI bot`}
+                        >
+                          KICK
+                        </button>
+                      )}
+                      <div>
+                        <div className="font-mono text-xs font-bold text-[#10B981]">
+                          {formatCr(participant?.purse_remaining_lakhs ?? roomState?.starting_purse_lakhs ?? 12000)}
+                        </div>
+                        <div className="text-[9px] text-[#86948A] uppercase font-mono font-medium">Purse</div>
                       </div>
-                      <div className="text-[9px] text-[#86948A] uppercase font-mono font-medium">Purse</div>
                     </div>
                   </div>
                 );

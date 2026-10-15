@@ -115,8 +115,8 @@ export function advanceToNextPlayer(roomId: string) {
   const tx = db.transaction(() => {
     const nextPlayer = db.prepare(`
       SELECT player_id FROM auction_queue 
-      WHERE room_id = ? AND status = 'PENDING'
-      ORDER BY queue_position ASC LIMIT 1
+      WHERE room_id = ? AND status IN ('PENDING', 'RELISTED')
+      ORDER BY CASE status WHEN 'PENDING' THEN 0 ELSE 1 END, queue_position ASC LIMIT 1
     `).get(roomId) as { player_id: string } | undefined;
 
     if (nextPlayer) {
@@ -135,3 +135,71 @@ export function advanceToNextPlayer(roomId: string) {
   });
   tx();
 }
+
+/**
+ * Returns the active player to a final relist round. Relisted players are only
+ * called after every original pending player has been auctioned.
+ */
+export function relistCurrent(roomId: string) {
+  const tx = db.transaction(() => {
+    const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as unknown as Room | undefined;
+    if (!room || !room.current_player_id) return null;
+
+    db.prepare(`UPDATE auction_queue SET status = 'RELISTED' WHERE room_id = ? AND player_id = ?`)
+      .run(room.id, room.current_player_id);
+    db.prepare(`
+      UPDATE rooms
+      SET current_player_id = NULL, current_bid_lakhs = 0, current_bidder_franchise = NULL, bid_deadline = NULL
+      WHERE id = ?
+    `).run(room.id);
+
+    return room;
+  });
+  return tx();
+}
+
+/**
+ * Moves an already UNSOLD player back to the final relisted round.
+ */
+export function relistUnsoldPlayer(roomId: string, playerId: string) {
+  const tx = db.transaction(() => {
+    const item = db.prepare(`SELECT * FROM auction_queue WHERE room_id = ? AND player_id = ? AND status = 'UNSOLD'`)
+      .get(roomId, playerId);
+    if (!item) return false;
+
+    db.prepare(`UPDATE auction_queue SET status = 'RELISTED' WHERE room_id = ? AND player_id = ?`)
+      .run(roomId, playerId);
+    return true;
+  });
+  return tx();
+}
+
+/**
+ * Temporarily defers the active player 5 positions down the active queue,
+ * so they reappear shortly without waiting for the final round.
+ */
+export function deferCurrentPlayer(roomId: string, bumpPositions = 5) {
+  const tx = db.transaction(() => {
+    const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as unknown as Room | undefined;
+    if (!room || !room.current_player_id) return null;
+
+    const currentItem = db.prepare(`SELECT queue_position FROM auction_queue WHERE room_id = ? AND player_id = ?`)
+      .get(roomId, room.current_player_id) as any;
+    const targetPos = (currentItem?.queue_position || 0) + bumpPositions + 0.5;
+
+    db.prepare(`UPDATE auction_queue SET status = 'PENDING', queue_position = ? WHERE room_id = ? AND player_id = ?`)
+      .run(targetPos, room.id, room.current_player_id);
+
+    db.prepare(`
+      UPDATE rooms
+      SET current_player_id = NULL, current_bid_lakhs = 0, current_bidder_franchise = NULL, bid_deadline = NULL
+      WHERE id = ?
+    `).run(room.id);
+
+    return room;
+  });
+  return tx();
+}
+
+
+

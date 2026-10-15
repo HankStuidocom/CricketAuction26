@@ -6,7 +6,7 @@ import {
   FRANCHISE_MAP, 
   formatCr 
 } from '../lib/utils';
-import { safeFetch, getSocketUrl } from '../lib/api';
+import { safeFetch, getSocketUrl, warmupServer } from '../lib/api';
 import GameButton from '../components/GameButton';
 import GamePanel from '../components/GamePanel';
 import { 
@@ -148,6 +148,7 @@ export default function Home() {
       if (stored) setUser(JSON.parse(stored));
     } catch {}
 
+    warmupServer();
     fetchRooms();
 
     // Real-time synchronization using Socket.IO
