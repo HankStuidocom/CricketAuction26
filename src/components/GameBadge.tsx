@@ -80,9 +80,12 @@ export function StatusOriginBadge({ status, country }: { status: string; country
 // 3. Points Hex Badge
 export function PointsBadge({ points }: { points: number }) {
   return (
-    <div className="inline-flex items-center gap-1 px-2 h-[22px] rounded-[3px] bg-[#F59E0B]/15 border border-[#F59E0B]/35 text-[#FFB95F] font-mono font-bold text-[10px] tracking-wide">
+    <div 
+      className="inline-flex items-center gap-1 px-2 h-[22px] rounded-[3px] bg-[#F59E0B]/15 border border-[#F59E0B]/35 text-[#FFB95F] font-mono font-bold text-[10px] tracking-wide"
+      title="Player Rating (1–15 scale from official auction database)"
+    >
       <span className="text-[10px]">★</span>
-      <span>{points} PTS</span>
+      <span>{points}/15 Rating</span>
     </div>
   );
 }

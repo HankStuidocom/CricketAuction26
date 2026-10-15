@@ -104,7 +104,7 @@ export default function PlayerHeroCard({
               <span>{franchise.emoji}</span>
             )}
             <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#86948A]">
-              {franchise.name}
+              2026 Team: {franchise.name}
             </span>
           </div>
         )}
@@ -118,7 +118,7 @@ export default function PlayerHeroCard({
         <div className="flex items-center justify-center gap-3 mt-2 text-[11px] text-[#86948A] font-mono">
           <span>{player.id}</span>
           <span>•</span>
-          <span className="text-[#10B981] font-mono font-bold">{player.squad_status || 'Auction Pool'}</span>
+          <span className="text-[#10B981] font-mono font-bold">IPL 2026 Auction Pool</span>
         </div>
       </div>
 

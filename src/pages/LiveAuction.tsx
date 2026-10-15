@@ -154,7 +154,8 @@ export default function LiveAuction() {
   const isOSLimitReached = isOverseasPlayer && osCount >= 4;
 
   const minBasePrice = 50; // ₹0.5 Cr
-  const slotsRemainingAfterThis = Math.max(0, maxSquad - currentSquadCount - 1);
+  const minRoster = (roomState as any)?.min_squad_size || Math.min(5, maxSquad);
+  const slotsRemainingAfterThis = Math.max(0, minRoster - currentSquadCount - 1);
   const requiredReserve = slotsRemainingAfterThis * minBasePrice;
   const myPurse = myParticipant?.purse_remaining_lakhs || 0;
   const isInsufficientPurse = (myPurse - nextBidAmount) < requiredReserve;
@@ -213,7 +214,7 @@ export default function LiveAuction() {
   }
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] flex flex-col md:flex-row font-['Inter',sans-serif] relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] flex flex-col lg:flex-row font-['Inter',sans-serif] relative overflow-x-hidden">
       
       {/* Stadium Spotlight Background Mesh */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#10B981]/10 rounded-full blur-3xl pointer-events-none" />
@@ -258,8 +259,8 @@ export default function LiveAuction() {
                     <span className="text-[#86948A]/40">|</span>
                     <span className="text-xs font-bold text-[#86948A]">{myDisplayName}</span>
                     {isHost && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-[2px] bg-[#F59E0B]/15 text-[#FFB95F] text-[8px] font-mono font-bold">
-                        <CrownHostIcon size={10} color="#FFB95F" /> HOST
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-[2px] bg-[#F59E0B]/15 text-[#FFB95F] text-[10px] font-mono font-bold">
+                        <CrownHostIcon size={11} color="#FFB95F" /> HOST
                       </span>
                     )}
                   </>
@@ -427,8 +428,10 @@ export default function LiveAuction() {
                   { label: '+50 Lakh', add: 50 },
                   { label: '+1 Crore', add: 100 },
                 ].map((qb) => {
-                  const targetBid = (currentBid || activePlayerDetails?.base_price_lakhs || 50) + qb.add;
-                  const canQuickBid = (myPurse - targetBid) >= requiredReserve;
+                  const baseLotPrice = activePlayerDetails?.base_price_lakhs || 50;
+                  const currentBaseline = currentBid === 0 ? baseLotPrice : currentBid;
+                  const targetBid = currentBaseline + qb.add;
+                  const canQuickBid = (myPurse - targetBid) >= requiredReserve && targetBid > currentBid && !isHighestBidder && !isPaused && !isSquadFull && !isOSLimitReached && !isSpectator && !isManager;
                   return (
                     <button
                       key={qb.label}
@@ -438,7 +441,7 @@ export default function LiveAuction() {
                         sounds.playBid();
                         placeBid(targetBid);
                       }}
-                      className="py-1.5 px-2 rounded-[4px] bg-[#111827] hover:bg-[#1C1F29] border border-[#1F2937] hover:border-[#10B981]/50 text-center text-xs font-mono font-bold text-[#10B981] disabled:opacity-40 transition active:scale-95"
+                      className="py-1.5 px-2 rounded-[4px] bg-[#111827] hover:bg-[#1C1F29] border border-[#1F2937] hover:border-[#10B981]/50 text-center text-xs font-mono font-bold text-[#10B981] disabled:opacity-40 transition active:scale-95 cursor-pointer"
                     >
                       {qb.label}
                     </button>
@@ -456,7 +459,7 @@ export default function LiveAuction() {
                   <PurseCoinsIcon size={14} color="#10B981" />
                 </div>
                 <div>
-                  <span className="text-[9px] text-[#86948A] font-mono uppercase font-bold block">Remaining Purse</span>
+                  <span className="text-[11px] text-[#86948A] font-mono uppercase font-bold block">Remaining Purse</span>
                   <span className="font-mono font-bold text-sm text-[#DFE2EF]">
                     {formatCr(myParticipant.purse_remaining_lakhs)}
                   </span>
@@ -464,7 +467,7 @@ export default function LiveAuction() {
               </div>
 
               <div className="text-right">
-                <span className="text-[9px] text-[#86948A] font-mono uppercase font-bold block">Squad Slots</span>
+                <span className="text-[11px] text-[#86948A] font-mono uppercase font-bold block">Squad Slots</span>
                 <span className="font-mono font-bold text-xs text-[#10B981]">
                   {myParticipant.squad_count || 0} / {roomState?.max_squad_size || 10} Players
                 </span>
@@ -476,7 +479,7 @@ export default function LiveAuction() {
       </div>
 
       {/* Side Console / Team Deck (Desktop Right / Mobile Bottom) */}
-      <div className="w-full md:w-96 border-t md:border-t-0 md:border-l border-[#1F2937] bg-[#0F131C] p-4 flex flex-col justify-between">
+      <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-[#1F2937] bg-[#0F131C] p-4 flex flex-col justify-between">
         <div>
           {/* Host Control Deck - Visible only to host (never for spectators) */}
           {!isSpectator && isHost && (

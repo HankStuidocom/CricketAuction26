@@ -10,21 +10,12 @@ export interface AIDecision {
 }
 
 export function calculateAIMaxValuation(player: Player, participant: RoomParticipant, room: Room): number {
-  // Fair market valuation based on player points (7 to 15)
-  let baseValue = player.base_price_lakhs;
-  if (player.game_points >= 15) {
-    baseValue = 1800; // ~18 Cr
-  } else if (player.game_points >= 13) {
-    baseValue = 1300; // ~13 Cr
-  } else if (player.game_points >= 12) {
-    baseValue = 950;  // ~9.5 Cr
-  } else if (player.game_points >= 10) {
-    baseValue = 550;  // ~5.5 Cr
-  } else if (player.game_points >= 8) {
-    baseValue = 250;  // ~2.5 Cr
-  } else {
-    baseValue = Math.max(player.base_price_lakhs, 100);
-  }
+  // Fair market continuous valuation based on player points (7 to 15)
+  const normalizedRating = Math.max(1, Math.min(15, player.game_points || 8));
+  // Continuous power curve: rating 7 = ~1.5Cr, rating 10 = ~5.3Cr, rating 12 = ~9.6Cr, rating 15 = ~18.7Cr
+  const ratingFactor = Math.pow(Math.max(0, normalizedRating - 6) / 9, 1.8);
+  const calculatedBase = 120 + Math.round(ratingFactor * 1750);
+  let baseValue = Math.max(player.base_price_lakhs, calculatedBase);
 
   // Role balance modifier
   const squad = db.prepare(`
@@ -60,11 +51,12 @@ export function calculateAIMaxValuation(player: Player, participant: RoomPartici
   if (difficulty === 'EASY') baseValue *= 0.8;
   else if (difficulty === 'HARD') baseValue *= 1.25;
 
-  // Purse ceiling: ensure AI keeps enough reserve to complete minimum squad
+  // Purse ceiling: ensure AI keeps enough reserve to complete minimum viable squad
   const squadSize = db.prepare('SELECT COUNT(*) as count FROM squad_players WHERE room_id = ? AND franchise_id = ?')
     .get(room.id, participant.franchise_id) as { count: number };
-  const slotsRemaining = room.max_squad_size - squadSize.count;
-  const reserveNeeded = Math.max(0, slotsRemaining - 1) * 50;
+  const minRoster = (room as any).min_squad_size || Math.min(5, room.max_squad_size || 10);
+  const slotsRemaining = Math.max(0, minRoster - squadSize.count - 1);
+  const reserveNeeded = slotsRemaining * 50;
   const maxAffordable = participant.purse_remaining_lakhs - reserveNeeded;
 
   return Math.max(player.base_price_lakhs, Math.min(Math.round(baseValue), maxAffordable));
@@ -111,7 +103,9 @@ export function makeAIDecision(roomCode: string, franchiseId: string): AIDecisio
   
   // Check purse (with safe bidding reserve)
   const minBasePrice = 50;
-  const requiredPurse = nextBid + (room.max_squad_size - squadSize.count - 1) * minBasePrice;
+  const minRoster = (room as any).min_squad_size || Math.min(5, room.max_squad_size || 10);
+  const requiredSlots = Math.max(0, minRoster - squadSize.count - 1);
+  const requiredPurse = nextBid + (requiredSlots * minBasePrice);
   if (participant.purse_remaining_lakhs < requiredPurse) {
     return { shouldBid: false, reason: 'Insufficient purse' };
   }

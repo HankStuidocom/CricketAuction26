@@ -221,7 +221,7 @@ export default function CommissionerControlRoom({
               <span className="text-[10px] text-[#86948A] font-mono font-bold">ARENA #{code}</span>
             </div>
             <h2 className="font-display font-black text-base sm:text-lg text-white mt-0.5">
-              {roomState?.room_name || `Tournament #${code}`} · <span className="text-[#10B981] font-mono text-sm">{roomState?.participants?.length || 0}/10 Franchises Active</span>
+              {roomState?.room_name || `Tournament #${code}`} · <span className="text-[#10B981] font-mono text-sm">{roomState?.participants?.length || 0}/{roomState?.max_teams || 10} Franchises Active</span>
             </h2>
           </div>
         </div>

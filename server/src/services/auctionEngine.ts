@@ -27,7 +27,9 @@ export function processBid(roomCode: string, franchiseId: string, amount: number
       (db.prepare('SELECT base_price_lakhs FROM players WHERE id = ?').get(roomRow.current_player_id) as any)?.base_price_lakhs || 50
       : getNextValidBid(roomRow.current_bid_lakhs);
 
-    if (amount !== nextValidBid) throw new Error('Invalid bid amount');
+    if (amount < nextValidBid || amount % 5 !== 0) {
+      throw new Error(`Invalid bid amount. Must be at least ${nextValidBid} Lakhs in 5L multiples.`);
+    }
     if (roomRow.current_bidder_franchise === franchiseId) throw new Error('Already the highest bidder');
 
     const squadSize = db.prepare('SELECT COUNT(*) as count FROM squad_players WHERE room_id = ? AND franchise_id = ?')
@@ -47,7 +49,9 @@ export function processBid(roomCode: string, franchiseId: string, amount: number
     }
 
     const minBasePrice = 50;
-    const requiredPurse = amount + (roomRow.max_squad_size - squadSize.count - 1) * minBasePrice;
+    const minRoster = (roomRow as any).min_squad_size || Math.min(5, roomRow.max_squad_size || 10);
+    const requiredSlots = Math.max(0, minRoster - squadSize.count - 1);
+    const requiredPurse = amount + (requiredSlots * minBasePrice);
     if (participantRow.purse_remaining_lakhs < requiredPurse) {
       throw new Error('Insufficient purse for safe bidding');
     }

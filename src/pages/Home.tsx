@@ -224,7 +224,7 @@ export default function Home() {
   // FILTER RULES: Public & Currently Live Rooms ONLY
   const publicLiveRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
-    const isLive = r.status === 'IN_PROGRESS';
+    const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(r.status);
     return isPublic && isLive;
   });
 
@@ -415,7 +415,7 @@ export default function Home() {
                       {leadingTeam.franchise_id}
                     </span>
                     <span className="text-[11px] font-mono font-bold text-[#10B981] mt-0.5">
-                      {leadingTeam.franchise_id} — {leadingTeam.points || 0} PT
+                      {leadingTeam.franchise_id} — {leadingTeam.points || 0} Rating Pts
                     </span>
                   </div>
 
@@ -449,7 +449,7 @@ export default function Home() {
                       {runnerUpTeam.franchise_id}
                     </span>
                     <span className="text-[11px] font-mono font-bold text-[#06B6D4] mt-0.5">
-                      {runnerUpTeam.franchise_id} — {runnerUpTeam.points || 0} PT
+                      {runnerUpTeam.franchise_id} — {runnerUpTeam.points || 0} Rating Pts
                     </span>
                   </div>
 

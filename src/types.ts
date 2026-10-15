@@ -2,7 +2,7 @@
 
 export type PlayerRole = 'Batter' | 'Bowler' | 'All-Rounder' | 'Wicket-Keeper';
 export type PlayerStatus = 'IND' | 'OS';
-export type AuctionStatus = 'LOBBY' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+export type AuctionStatus = 'LOBBY' | 'IN_PROGRESS' | 'LIVE' | 'FINAL_ROUND' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 export type QueueStatus = 'PENDING' | 'ACTIVE' | 'SOLD' | 'UNSOLD' | 'RELISTED';
 export type AIDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
 

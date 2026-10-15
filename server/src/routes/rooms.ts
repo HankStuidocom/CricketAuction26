@@ -272,16 +272,88 @@ router.post('/:code/start', (req, res) => {
 router.get('/:code/results', (req, res) => {
   try {
     const code = (req.params.code || '').trim().toUpperCase();
-    const room = db.prepare('SELECT id FROM rooms WHERE UPPER(room_code) = ?').get(code) as any;
+    const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(code) as any;
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
-    const results = db.prepare(`
-      SELECT sp.*, p.player_name, p.primary_role 
+    const players = db.prepare(`
+      SELECT sp.id, sp.room_id, sp.player_id, sp.franchise_id, sp.sold_price_lakhs, sp.sold_at,
+             p.player_name, p.primary_role, p.country, p.status, p.game_points, p.base_price_lakhs, p.franchise_2026
       FROM squad_players sp
       JOIN players p ON p.id = sp.player_id
       WHERE sp.room_id = ?
-    `).all(room.id);
-    res.json(results);
+      ORDER BY sp.sold_price_lakhs DESC, sp.sold_at ASC
+    `).all(room.id) as any[];
+
+    const participants = db.prepare('SELECT * FROM room_participants WHERE room_id = ?').all(room.id) as any[];
+    const teams = participants.map(p => {
+      const squadForTeam = players.filter(pl => pl.franchise_id === p.franchise_id);
+      const totalPoints = squadForTeam.reduce((sum, pl) => sum + (pl.game_points || 0), 0);
+      const totalSpent = squadForTeam.reduce((sum, pl) => sum + (pl.sold_price_lakhs || 0), 0);
+      const overseasCount = squadForTeam.filter(pl => pl.status === 'OS').length;
+      const avgRating = squadForTeam.length > 0 ? Number((totalPoints / squadForTeam.length).toFixed(1)) : 0;
+      const batters = squadForTeam.filter(pl => pl.primary_role === 'Batter').length;
+      const bowlers = squadForTeam.filter(pl => pl.primary_role === 'Bowler').length;
+      const allRounders = squadForTeam.filter(pl => pl.primary_role === 'All-Rounder').length;
+      const keepers = squadForTeam.filter(pl => pl.primary_role === 'Wicket-Keeper').length;
+
+      return {
+        franchise_id: p.franchise_id,
+        display_name: p.display_name,
+        is_ai: Boolean(p.is_ai),
+        purse_remaining_lakhs: p.purse_remaining_lakhs,
+        total_spent_lakhs: totalSpent,
+        total_points: totalPoints,
+        avg_rating: avgRating,
+        squad_count: squadForTeam.length,
+        overseas_count: overseasCount,
+        roles: { batters, bowlers, allRounders, keepers },
+        squad: squadForTeam,
+        rank: 1
+      };
+    });
+
+    // Rank teams by total_points DESC, then purse_remaining_lakhs DESC
+    teams.sort((a, b) => {
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      return b.purse_remaining_lakhs - a.purse_remaining_lakhs;
+    });
+
+    teams.forEach((t, i) => { t.rank = i + 1; });
+
+    const totalSpentLakhs = players.reduce((sum, p) => sum + (p.sold_price_lakhs || 0), 0);
+    const topBuy = players.length > 0 ? players[0] : null;
+
+    let bestValuePlayer: any = null;
+    let maxEfficiency = 0;
+    for (const pl of players) {
+      if (pl.sold_price_lakhs > 0) {
+        const efficiency = (pl.game_points || 0) / (pl.sold_price_lakhs / 100);
+        if (efficiency > maxEfficiency) {
+          maxEfficiency = efficiency;
+          bestValuePlayer = pl;
+        }
+      }
+    }
+
+    const topSpender = [...teams].sort((a, b) => b.total_spent_lakhs - a.total_spent_lakhs)[0] || null;
+    const champion = teams[0] || null;
+
+    const sanitizedRoom = { ...room };
+    delete sanitizedRoom.password_hash;
+
+    res.json({
+      room: sanitizedRoom,
+      players,
+      teams,
+      champion,
+      awards: {
+        topBuy,
+        bestValue: bestValuePlayer,
+        topSpender
+      },
+      total_spent_lakhs: totalSpentLakhs,
+      total_players_drafted: players.length
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
