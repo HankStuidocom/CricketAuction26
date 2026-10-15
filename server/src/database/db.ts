@@ -69,9 +69,21 @@ class PersistentDatabase {
       }
     }
 
-    // 4. Initialize SqlJs with buffer or clean instance
-    if (loadedBuffer && loadedBuffer.length > 0) {
-      this.db = new SQL.Database(loadedBuffer);
+    const isValidSqlite = (buf: Buffer | null): boolean => {
+      if (!buf || buf.length < 100) return false;
+      return buf.toString('utf8', 0, 15) === 'SQLite format 3';
+    };
+
+    // 4. Initialize SqlJs with validated buffer or clean instance
+    if (isValidSqlite(loadedBuffer)) {
+      try {
+        this.db = new SQL.Database(loadedBuffer!);
+        console.log(`[Database] Successfully mounted persistent database (${loadedBuffer!.length} bytes)`);
+      } catch (err: any) {
+        console.warn('[Database] Snapshot mounting failed, initializing fresh instance:', err.message);
+        this.db = new SQL.Database();
+        this.persist();
+      }
     } else {
       this.db = new SQL.Database();
       console.log('[Database] Initialized new clean database instance');
