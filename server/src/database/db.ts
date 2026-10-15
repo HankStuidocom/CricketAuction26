@@ -1,34 +1,120 @@
 import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import path from 'path';
 import fs from 'fs';
+import { Pool } from 'pg';
 
 const dbPath = path.resolve(__dirname, '../../data/auction.db');
+const DATABASE_URL = process.env.DATABASE_URL || '';
 
-class SqlJsWrapper {
+class PersistentDatabase {
   private db: SqlJsDatabase | null = null;
   private saveTimeout: NodeJS.Timeout | null = null;
+  private pgPool: Pool | null = null;
+  private isPersisting: boolean = false;
+  private pendingPersist: boolean = false;
 
   async init() {
+    // 1. Initialize Postgres connection pool if DATABASE_URL is configured
+    if (DATABASE_URL) {
+      try {
+        this.pgPool = new Pool({
+          connectionString: DATABASE_URL,
+          ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+          max: 10,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 10000
+        });
+
+        // Ensure persistent snapshots table exists in Postgres
+        await this.pgPool.query(`
+          CREATE TABLE IF NOT EXISTS system_snapshots (
+            id TEXT PRIMARY KEY,
+            payload BYTEA NOT NULL,
+            updated_at BIGINT NOT NULL
+          )
+        `);
+        console.log('[Postgres] Connected successfully to persistent Render database');
+      } catch (pgErr: any) {
+        console.error('[Postgres] Connection initialization failed, falling back to local storage:', pgErr.message);
+        this.pgPool = null;
+      }
+    }
+
     const SQL = await initSqlJs();
-    if (fs.existsSync(dbPath)) {
-      const buffer = fs.readFileSync(dbPath);
-      this.db = new SQL.Database(buffer);
+    let loadedBuffer: Buffer | null = null;
+
+    // 2. Try restoring latest snapshot directly from Postgres
+    if (this.pgPool) {
+      try {
+        const res = await this.pgPool.query(
+          'SELECT payload, updated_at FROM system_snapshots WHERE id = $1',
+          ['auction_db']
+        );
+        if (res.rows.length > 0 && res.rows[0].payload) {
+          loadedBuffer = res.rows[0].payload;
+          console.log(`[Postgres] Restored auction database snapshot (${loadedBuffer?.length} bytes, updated: ${new Date(Number(res.rows[0].updated_at)).toISOString()})`);
+        }
+      } catch (err: any) {
+        console.error('[Postgres] Failed to retrieve snapshot from database:', err.message);
+      }
+    }
+
+    // 3. Fallback to local disk file if Postgres had no snapshot yet
+    if (!loadedBuffer && fs.existsSync(dbPath)) {
+      try {
+        loadedBuffer = fs.readFileSync(dbPath);
+        console.log(`[Disk] Restored auction database from local file (${loadedBuffer.length} bytes)`);
+      } catch (diskErr: any) {
+        console.error('[Disk] Failed reading local file:', diskErr.message);
+      }
+    }
+
+    // 4. Initialize SqlJs with buffer or clean instance
+    if (loadedBuffer && loadedBuffer.length > 0) {
+      this.db = new SQL.Database(loadedBuffer);
     } else {
       this.db = new SQL.Database();
+      console.log('[Database] Initialized new clean database instance');
       this.persist();
     }
   }
 
-  private persist() {
-    if (!this.db) return;
+  private async persist() {
+    if (!this.db || this.isPersisting) {
+      this.pendingPersist = true;
+      return;
+    }
+    this.isPersisting = true;
     try {
       const data = this.db.export();
       const buffer = Buffer.from(data);
-      const dir = path.dirname(dbPath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(dbPath, buffer);
-    } catch (e) {
-      console.error('Failed to persist database:', e);
+
+      // Save to local disk as local backup
+      try {
+        const dir = path.dirname(dbPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(dbPath, buffer);
+      } catch {
+        // Disk write might be ignored on read-only cloud mounts
+      }
+
+      // Persist to Postgres database
+      if (this.pgPool) {
+        await this.pgPool.query(
+          `INSERT INTO system_snapshots (id, payload, updated_at)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at`,
+          ['auction_db', buffer, Date.now()]
+        );
+      }
+    } catch (e: any) {
+      console.error('Failed to persist database:', e.message);
+    } finally {
+      this.isPersisting = false;
+      if (this.pendingPersist) {
+        this.pendingPersist = false;
+        this.schedulePersist();
+      }
     }
   }
 
@@ -36,7 +122,7 @@ class SqlJsWrapper {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
       this.persist();
-    }, 200);
+    }, 250);
   }
 
   exec(sql: string) {
@@ -99,5 +185,5 @@ class SqlJsWrapper {
   }
 }
 
-const db = new SqlJsWrapper();
+const db = new PersistentDatabase();
 export default db;

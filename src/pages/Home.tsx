@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Trophy
 } from 'lucide-react';
+import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
 export type TabType = 'home' | 'matches' | 'play' | 'friends' | 'profile';
 
@@ -303,6 +304,7 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
+            <ServerHealthBadge compact />
             <button
               onClick={() => setShowSearch(prev => !prev)}
               className={`w-9 h-9 rounded-[6px] border transition flex items-center justify-center ${

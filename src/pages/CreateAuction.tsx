@@ -13,6 +13,7 @@ import {
   CrownHostIcon
 } from '../components/GameIcons';
 import { ArrowLeft, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
+import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
 export default function CreateAuction() {
   const navigate = useNavigate();
@@ -129,7 +130,7 @@ export default function CreateAuction() {
           </span>
         </div>
 
-        <div className="w-9"></div>
+        <ServerHealthBadge compact />
       </div>
 
       {/* Tactical Step Progress Bar */}

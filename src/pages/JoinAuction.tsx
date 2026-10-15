@@ -11,6 +11,7 @@ import {
   GavelIcon 
 } from '../components/GameIcons';
 import { ArrowLeft, AlertCircle, Lock, Shield, Users } from 'lucide-react';
+import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
 export default function JoinAuction() {
   const navigate = useNavigate();
@@ -136,7 +137,7 @@ export default function JoinAuction() {
           </span>
         </div>
 
-        <div className="w-9"></div>
+        <ServerHealthBadge compact />
       </div>
 
       <GamePanel glow="none" className="w-full max-w-lg p-6 sm:p-8">

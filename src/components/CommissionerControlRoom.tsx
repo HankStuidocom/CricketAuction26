@@ -20,6 +20,7 @@ import GameButton from './GameButton';
 import PlayerHeroCard from './PlayerHeroCard';
 import { ALL_FRANCHISES, FRANCHISE_MAP, formatCr } from '../lib/utils';
 import { AlertCircle, Megaphone, ArrowRight, Check, X, ShieldAlert, Users, Layers, History, Volume2 } from 'lucide-react';
+import { ServerHealthBadge } from './ServerHealthBadge';
 
 interface Props {
   code: string;
@@ -160,6 +161,7 @@ export default function CommissionerControlRoom({
 
         {/* Global Timer & Settings Control Strip */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <ServerHealthBadge compact />
           <div className="flex items-center gap-2 bg-[#0F131C] px-3 py-1.5 rounded-[6px] border border-[#1F2937]">
             <TimerGaugeIcon size={16} color={timeLeft <= 3 && timeLeft > 0 ? '#EF4444' : '#10B981'} />
             <span className="text-[10px] text-[#86948A] font-mono uppercase font-bold">CLOCK</span>

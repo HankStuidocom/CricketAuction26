@@ -30,6 +30,7 @@ import {
 import { AlertCircle, LogOut, Eye, ArrowLeft, Megaphone } from 'lucide-react';
 import { sounds } from '../utils/sound';
 import CommissionerControlRoom from '../components/CommissionerControlRoom';
+import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
 export default function LiveAuction() {
   const { code } = useParams();
@@ -254,7 +255,8 @@ export default function LiveAuction() {
           </div>
 
           {/* Timer Readout & Spectator Exit */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ServerHealthBadge compact />
             {isSpectator && (
               <button
                 onClick={() => navigate('/')}

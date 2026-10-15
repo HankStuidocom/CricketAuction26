@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getSocketUrl } from '../lib/api';
+import { getRoomSession } from '../lib/utils';
 
 export function useAuction(roomCode: string, myFranchise?: string, myUserId?: string, isSpectator?: boolean, isManager?: boolean) {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -8,11 +9,13 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
-
   const [announcements, setAnnouncements] = useState<any[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem('ca26_token');
+    const savedSession = getRoomSession(roomCode || '');
+    const effectivePassword = savedSession?.password;
+
     const newSocket = io(getSocketUrl(), {
       auth: { token }
     });
@@ -21,29 +24,37 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
 
     newSocket.on('connect', () => {
       setConnected(true);
-      if (isSpectator) {
-        newSocket.emit('join_room', {
-          roomCode,
-          isSpectator: true,
-          userId: myUserId || 'spectator-' + Math.random().toString(36).substring(7)
-        });
-      } else if (isManager) {
-        newSocket.emit('join_room', {
-          roomCode,
-          isManager: true,
-          userId: myUserId
-        });
-      } else {
-        newSocket.emit('join_room', { 
-          roomCode, 
-          franchise: myFranchise,
-          userId: myUserId || 'guest-' + Math.random().toString(36).substring(7)
-        });
-      }
+      newSocket.emit('join_room', {
+        roomCode,
+        isSpectator,
+        isManager,
+        franchise: isManager ? undefined : myFranchise,
+        userId: myUserId || savedSession?.userId || 'guest-' + Math.random().toString(36).substring(7),
+        displayName: savedSession?.displayName,
+        password: effectivePassword
+      });
     });
 
     newSocket.on('disconnect', () => {
       setConnected(false);
+    });
+
+    newSocket.on('join_handshake_success', (data) => {
+      if (data.room) {
+        setRoomState((prev: any) => ({ ...prev, ...data.room }));
+      }
+      if (data.notice) {
+        setError(data.notice);
+        setTimeout(() => setError(null), 5000);
+      }
+    });
+
+    newSocket.on('join_error', (err) => {
+      setError(err.message || `Join error (${err.code || 'UNKNOWN'})`);
+    });
+
+    newSocket.on('room_cancelled', (data) => {
+      setError(data.message || 'Room was cancelled by the host.');
     });
 
     newSocket.on('room_state', (state) => {
@@ -124,6 +135,18 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     }
   }, [socket, roomCode]);
 
+  const hostEndAuction = useCallback(() => {
+    if (socket && roomCode && myUserId) {
+      socket.emit('host_end_auction', { roomCode, userId: myUserId });
+    }
+  }, [socket, roomCode, myUserId]);
+
+  const hostCancelRoom = useCallback(() => {
+    if (socket && roomCode && myUserId) {
+      socket.emit('host_cancel_room', { roomCode, userId: myUserId });
+    }
+  }, [socket, roomCode, myUserId]);
+
   return {
     socket,
     roomState,
@@ -138,7 +161,9 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     sendAnnouncement,
     sendChat,
     kickPlayer,
-    updateAuctionSettings
+    updateAuctionSettings,
+    hostEndAuction,
+    hostCancelRoom
   };
 }
 

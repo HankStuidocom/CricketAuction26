@@ -142,73 +142,198 @@ export function setupSocketHandlers(io: Server) {
       const { roomCode, userId, franchise, displayName, password, isSpectator, isManager } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
-      if (!room) return socket.emit('error', { message: 'Room not found' });
+      
+      // 1. Room existence check
+      if (!room) {
+        return socket.emit('join_error', { 
+          code: 'ROOM_NOT_FOUND', 
+          message: 'Room not found. Check the room code and try again.' 
+        });
+      }
+
+      // 2. Room cancelled check
+      if (room.status === 'CANCELLED') {
+        return socket.emit('join_error', { 
+          code: 'ROOM_CANCELLED', 
+          message: 'This auction room has been closed by the host.' 
+        });
+      }
 
       const effectiveUserId = socket.data.authUserId || userId;
       socket.data.userId = effectiveUserId;
       socket.data.roomCode = normalizedCode;
 
-      // Handle pure spectator mode without taking up team slots
-      if (isSpectator) {
-        socket.join(normalizedCode);
-        const state = buildFullRoomState(normalizedCode);
-        if (state) {
-          socket.emit('room_state', state);
-        }
-        return;
-      }
+      // 3. Reconnect check: Is this user ALREADY a registered participant in this room?
+      const existingUserSlot = db.prepare(
+        'SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?'
+      ).get(room.id, effectiveUserId) as unknown as RoomParticipant | undefined;
 
-      // A manager is the room host, but deliberately does not join a team.
-      if (isManager && room.host_id === effectiveUserId && room.host_franchise === 'ADMIN') {
+      const isHostUser = room.host_id === effectiveUserId;
+
+      // RECONNECT CASE A: Commissioner reconnecting
+      if (isHostUser && room.host_franchise === 'ADMIN') {
         socket.join(normalizedCode);
+        socket.emit('join_handshake_success', {
+          role: 'COMMISSIONER',
+          roomCode: normalizedCode,
+          franchise: 'ADMIN',
+          participant: null,
+          isManager: true,
+          room
+        });
         socket.emit('room_joined', { room, participant: null, isManager: true });
         emitRoomState(io, normalizedCode);
         return;
       }
 
-      // Check password for private rooms
+      // RECONNECT CASE B: Existing franchise owner reconnecting after refresh or disconnect
+      if (existingUserSlot) {
+        socket.join(normalizedCode);
+        socket.emit('join_handshake_success', {
+          role: 'RECONNECT',
+          roomCode: normalizedCode,
+          franchise: existingUserSlot.franchise_id,
+          participant: existingUserSlot,
+          isManager: false,
+          room
+        });
+        socket.emit('room_joined', { room, participant: existingUserSlot });
+        emitRoomState(io, normalizedCode);
+        return;
+      }
+
+      // 4. Pure Spectator Join
+      if (isSpectator) {
+        socket.join(normalizedCode);
+        socket.emit('join_handshake_success', {
+          role: 'SPECTATOR',
+          roomCode: normalizedCode,
+          franchise: null,
+          participant: null,
+          isSpectator: true,
+          room
+        });
+        const state = buildFullRoomState(normalizedCode);
+        if (state) socket.emit('room_state', state);
+        return;
+      }
+
+      // 5. Game Manager Join (for first time host)
+      if (isManager && isHostUser && room.host_franchise === 'ADMIN') {
+        socket.join(normalizedCode);
+        socket.emit('join_handshake_success', {
+          role: 'COMMISSIONER',
+          roomCode: normalizedCode,
+          franchise: 'ADMIN',
+          participant: null,
+          isManager: true,
+          room
+        });
+        socket.emit('room_joined', { room, participant: null, isManager: true });
+        emitRoomState(io, normalizedCode);
+        return;
+      }
+
+      // 6. Private Room Password verification for new joiners
       if (room.is_private && room.password_hash) {
         if (!password || !bcrypt.compareSync(password, room.password_hash)) {
-          return socket.emit('error', { message: 'Invalid room password' });
+          return socket.emit('join_error', { 
+            code: 'INVALID_PASSWORD', 
+            message: 'Private-room password is incorrect' 
+          });
         }
       }
 
-      // Check if franchise is taken by another human user
-      const existing = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as unknown as RoomParticipant | undefined;
-      if (existing && existing.user_id !== effectiveUserId && !existing.is_ai) {
-        return socket.emit('error', { message: 'Franchise already taken' });
-      }
+      // 7. Check if Auction has already started
+      const isAuctionStarted = room.status !== 'LOBBY';
+      if (isAuctionStarted) {
+        // Can they take over an AI franchise?
+        const aiSlot = franchise 
+          ? db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ? AND is_ai = 1').get(room.id, franchise) as any
+          : db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND is_ai = 1 LIMIT 1').get(room.id) as any;
 
-      socket.join(normalizedCode);
-
-      let participant = existing;
-
-      // If not present, add them (or reclaim if AI)
-      if (!participant) {
-        try {
-          // Check if room is full (non-AI participants)
-          const humanCount = db.prepare('SELECT COUNT(*) as count FROM room_participants WHERE room_id = ? AND is_ai = 0').get(room.id) as { count: number };
-          if (humanCount.count >= room.max_teams) {
-            return socket.emit('error', { message: 'Room is full' });
-          }
-
-          const isHost = room.host_id === effectiveUserId ? 1 : 0;
-          db.prepare(`
-            INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, joined_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(crypto.randomUUID(), room.id, effectiveUserId, franchise, displayName, room.starting_purse_lakhs, isHost, Date.now());
+        if (aiSlot) {
+          // Player adopts AI franchise
+          db.prepare('UPDATE room_participants SET user_id = ?, is_ai = 0, ai_difficulty = NULL, display_name = ? WHERE id = ?')
+            .run(effectiveUserId, displayName || 'Player', aiSlot.id);
+          const adoptedParticipant = db.prepare('SELECT * FROM room_participants WHERE id = ?').get(aiSlot.id) as unknown as RoomParticipant;
           
-          participant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as unknown as RoomParticipant;
-        } catch (e) {
-          return socket.emit('error', { message: 'Could not join team' });
+          socket.join(normalizedCode);
+          socket.emit('join_handshake_success', {
+            role: 'FRANCHISE_OWNER',
+            roomCode: normalizedCode,
+            franchise: adoptedParticipant.franchise_id,
+            participant: adoptedParticipant,
+            room
+          });
+          socket.emit('room_joined', { room, participant: adoptedParticipant });
+          emitRoomState(io, normalizedCode);
+          return;
         }
-      } else if (participant.is_ai && effectiveUserId) {
-        // Reclaim AI slot
-        db.prepare('UPDATE room_participants SET user_id = ?, is_ai = 0, ai_difficulty = NULL, display_name = ? WHERE id = ?')
-          .run(effectiveUserId, displayName, participant.id);
-        participant = db.prepare('SELECT * FROM room_participants WHERE id = ?').get(participant.id) as unknown as RoomParticipant;
+
+        // If no AI franchise can be taken over, join as Spectator with clear notification
+        socket.join(normalizedCode);
+        socket.emit('join_handshake_success', {
+          role: 'SPECTATOR',
+          roomCode: normalizedCode,
+          franchise: null,
+          participant: null,
+          isSpectator: true,
+          notice: 'Auction already started; joined as spectator',
+          room
+        });
+        const state = buildFullRoomState(normalizedCode);
+        if (state) socket.emit('room_state', state);
+        return;
       }
 
+      // 8. In LOBBY: Check if requested franchise is already taken by another human
+      if (franchise) {
+        const targetSlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as unknown as RoomParticipant | undefined;
+        if (targetSlot && targetSlot.user_id !== effectiveUserId && !targetSlot.is_ai) {
+          return socket.emit('join_error', { 
+            code: 'FRANCHISE_TAKEN', 
+            message: `${franchise} is already taken by another player` 
+          });
+        }
+      }
+
+      // 9. Check if room is full
+      const humanCount = db.prepare('SELECT COUNT(*) as count FROM room_participants WHERE room_id = ? AND is_ai = 0').get(room.id) as { count: number };
+      if (humanCount.count >= room.max_teams) {
+        return socket.emit('join_error', { 
+          code: 'ROOM_FULL', 
+          message: 'Room is full (max teams reached)' 
+        });
+      }
+
+      // 10. Join new franchise slot (or take over AI slot)
+      socket.join(normalizedCode);
+      let participant: RoomParticipant | undefined;
+      const targetSlot = franchise 
+        ? db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as any
+        : null;
+
+      if (targetSlot && targetSlot.is_ai) {
+        db.prepare('UPDATE room_participants SET user_id = ?, is_ai = 0, ai_difficulty = NULL, display_name = ? WHERE id = ?')
+          .run(effectiveUserId, displayName, targetSlot.id);
+        participant = db.prepare('SELECT * FROM room_participants WHERE id = ?').get(targetSlot.id) as unknown as RoomParticipant;
+      } else if (franchise) {
+        const isHost = isHostUser ? 1 : 0;
+        db.prepare(`
+          INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, joined_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(crypto.randomUUID(), room.id, effectiveUserId, franchise, displayName, room.starting_purse_lakhs, isHost, Date.now());
+        participant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as unknown as RoomParticipant;
+      }
+
+      socket.emit('join_handshake_success', {
+        role: 'FRANCHISE_OWNER',
+        roomCode: normalizedCode,
+        franchise: participant?.franchise_id || franchise,
+        participant,
+        room
+      });
       socket.emit('room_joined', { room, participant });
       emitRoomState(io, normalizedCode);
     });
@@ -246,7 +371,7 @@ export function setupSocketHandlers(io: Server) {
         });
       }
 
-      db.prepare('UPDATE rooms SET status = "IN_PROGRESS", auction_started_at = ? WHERE id = ?').run(Date.now(), room.id);
+      db.prepare('UPDATE rooms SET status = "LIVE", auction_started_at = ? WHERE id = ?').run(Date.now(), room.id);
       if (!room.current_player_id) {
         advanceToNextPlayer(room.id);
       }
@@ -332,11 +457,13 @@ export function setupSocketHandlers(io: Server) {
       const callerUserId = socket.data.userId || userId;
       if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can resume' });
 
+      const pendingCount = db.prepare(`SELECT COUNT(*) as count FROM auction_queue WHERE room_id = ? AND status = 'PENDING'`).get(room.id) as { count: number };
+      const resumeStatus = pendingCount.count === 0 ? 'FINAL_ROUND' : 'LIVE';
       const newDeadline = room.is_unlimited_timer ? null : Date.now() + (room.bid_timer_seconds * 1000);
-      db.prepare('UPDATE rooms SET status = "IN_PROGRESS", bid_deadline = ? WHERE id = ?').run(newDeadline, room.id);
-      logEvent(room.id, 'resumed', { by: room.host_franchise });
+      db.prepare('UPDATE rooms SET status = ?, bid_deadline = ? WHERE id = ?').run(resumeStatus, newDeadline, room.id);
+      logEvent(room.id, 'resumed', { by: room.host_franchise, status: resumeStatus });
       emitRoomState(io, normalizedCode);
-      io.to(normalizedCode).emit('auction_resumed', { deadline: newDeadline });
+      io.to(normalizedCode).emit('auction_resumed', { deadline: newDeadline, status: resumeStatus });
 
       scheduleAIBidding(io, normalizedCode);
     });
@@ -477,11 +604,40 @@ export function setupSocketHandlers(io: Server) {
         return socket.emit('error', { message: 'Bid timer must be between 5 and 120 seconds' });
       }
       const unlimited = isUnlimitedTimer ? 1 : 0;
-      const deadline = unlimited || room.status !== 'IN_PROGRESS' ? null : Date.now() + timer * 1000;
+      const isActiveStatus = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(room.status);
+      const deadline = unlimited || !isActiveStatus ? null : Date.now() + timer * 1000;
       db.prepare('UPDATE rooms SET bid_timer_seconds = ?, is_unlimited_timer = ?, bid_deadline = ? WHERE id = ?')
         .run(timer, unlimited, deadline, room.id);
       logEvent(room.id, 'settings_updated', { bid_timer_seconds: timer, unlimited: Boolean(unlimited) });
       emitRoomState(io, normalizedCode);
+    });
+
+    socket.on('host_end_auction', (data) => {
+      const { roomCode, userId } = data;
+      const normalizedCode = (roomCode || '').trim().toUpperCase();
+      const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
+      if (!room) return;
+      const callerUserId = socket.data.userId || userId;
+      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can end the auction' });
+
+      db.prepare('UPDATE rooms SET status = ?, bid_deadline = NULL WHERE id = ?').run('COMPLETED', room.id);
+      logEvent(room.id, 'auction_ended_by_host', { by: callerUserId });
+      emitRoomState(io, normalizedCode);
+      io.to(normalizedCode).emit('auction_completed', { message: 'Auction concluded by Commissioner' });
+    });
+
+    socket.on('host_cancel_room', (data) => {
+      const { roomCode, userId } = data;
+      const normalizedCode = (roomCode || '').trim().toUpperCase();
+      const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
+      if (!room) return;
+      const callerUserId = socket.data.userId || userId;
+      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can cancel the room' });
+
+      db.prepare('UPDATE rooms SET status = ?, bid_deadline = NULL WHERE id = ?').run('CANCELLED', room.id);
+      logEvent(room.id, 'room_cancelled', { by: callerUserId });
+      emitRoomState(io, normalizedCode);
+      io.to(normalizedCode).emit('room_cancelled', { message: 'Room has been cancelled by host' });
     });
 
     socket.on('send_chat', (data) => {
@@ -592,7 +748,7 @@ export function setupSocketHandlers(io: Server) {
 
   // Global countdown timer check
   setInterval(() => {
-    const rooms = db.prepare('SELECT * FROM rooms WHERE status = "IN_PROGRESS" AND bid_deadline IS NOT NULL AND bid_deadline <= ?').all(Date.now()) as unknown as Room[];
+    const rooms = db.prepare('SELECT * FROM rooms WHERE status IN (\'IN_PROGRESS\', \'LIVE\', \'FINAL_ROUND\') AND bid_deadline IS NOT NULL AND bid_deadline <= ?').all(Date.now()) as unknown as Room[];
     for (const room of rooms) {
       finalizeCurrent(room.id);
       advanceToNextPlayer(room.id);

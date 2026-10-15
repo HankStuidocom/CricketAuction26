@@ -26,6 +26,19 @@ export interface Player {
   auction_status: string;
 }
 
+export type RoomStatus = 'LOBBY' | 'LIVE' | 'FINAL_ROUND' | 'COMPLETED' | 'CANCELLED' | 'IN_PROGRESS' | 'PAUSED';
+
+export type JoinRole = 'COMMISSIONER' | 'FRANCHISE_OWNER' | 'RECONNECT' | 'SPECTATOR';
+
+export type JoinErrorCode = 
+  | 'ROOM_NOT_FOUND' 
+  | 'ROOM_FULL' 
+  | 'FRANCHISE_TAKEN' 
+  | 'INVALID_PASSWORD' 
+  | 'AUCTION_STARTED' 
+  | 'ROOM_CANCELLED' 
+  | 'SERVER_WAKING';
+
 export interface Room {
   id: string;
   room_code: string;
@@ -34,7 +47,7 @@ export interface Room {
   host_franchise: string;
   is_private: number;
   password_hash: string | null;
-  status: string;
+  status: RoomStatus | string;
   max_teams: number;
   max_squad_size: number;
   starting_purse_lakhs: number;

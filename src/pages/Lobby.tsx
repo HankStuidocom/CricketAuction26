@@ -13,6 +13,7 @@ import {
   ShareInviteIcon 
 } from '../components/GameIcons';
 import { ArrowLeft, Copy, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
 export default function Lobby() {
   const { code } = useParams();
@@ -66,6 +67,38 @@ export default function Lobby() {
         password: passedPassword,
         isManager: isGameManager
       });
+    });
+
+    s.on('join_handshake_success', (data) => {
+      if (data.room) setRoom(data.room);
+      if (data.role === 'COMMISSIONER') {
+        setMyFranchise('ADMIN');
+      } else if (data.franchise) {
+        setMyFranchise(data.franchise);
+      } else if (data.participant?.franchise_id) {
+        setMyFranchise(data.participant.franchise_id);
+      }
+      fetchRoomDetails();
+    });
+
+    s.on('join_error', (data) => {
+      let friendlyMsg = data.message;
+      if (data.code === 'ROOM_NOT_FOUND') {
+        friendlyMsg = 'Room not found. Please check the code.';
+      } else if (data.code === 'ROOM_CANCELLED') {
+        friendlyMsg = 'This auction room has been cancelled by the host.';
+      } else if (data.code === 'INVALID_PASSWORD') {
+        friendlyMsg = 'Incorrect password for this private arena.';
+      } else if (data.code === 'FRANCHISE_TAKEN') {
+        friendlyMsg = data.message || 'This franchise is already taken by another player.';
+      } else if (data.code === 'ROOM_FULL') {
+        friendlyMsg = 'Arena is full (max teams reached).';
+      }
+      setError(friendlyMsg);
+    });
+
+    s.on('room_cancelled', (data) => {
+      setError(data.message || 'Room was cancelled by the host.');
     });
 
     s.on('room_joined', (data) => {
@@ -224,14 +257,17 @@ export default function Lobby() {
             </span>
           </div>
 
-          <button
-            onClick={copyCode}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111827] border border-[#10B981]/40 hover:border-[#10B981] rounded-[4px] text-xs font-mono font-bold text-[#10B981] transition shadow-sm"
-            title="Copy Arena Code"
-          >
-            <span>#{code}</span>
-            {copied ? <Check size={13} className="text-[#10B981]" /> : <Copy size={13} />}
-          </button>
+          <div className="flex items-center gap-2">
+            <ServerHealthBadge compact />
+            <button
+              onClick={copyCode}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111827] border border-[#10B981]/40 hover:border-[#10B981] rounded-[4px] text-xs font-mono font-bold text-[#10B981] transition shadow-sm"
+              title="Copy Arena Code"
+            >
+              <span>#{code}</span>
+              {copied ? <Check size={13} className="text-[#10B981]" /> : <Copy size={13} />}
+            </button>
+          </div>
         </div>
 
         {error && (

@@ -12,7 +12,8 @@ export function processBid(roomCode: string, franchiseId: string, amount: number
   const tx = db.transaction(() => {
     const roomRow = db.prepare('SELECT * FROM rooms WHERE room_code = ?').get(roomCode) as unknown as Room | undefined;
     if (!roomRow) throw new Error('Room not found');
-    if (roomRow.status !== 'IN_PROGRESS') throw new Error('Auction is not in progress');
+    const isLive = roomRow.status === 'LIVE' || roomRow.status === 'IN_PROGRESS' || roomRow.status === 'FINAL_ROUND';
+    if (!isLive) throw new Error('Auction is not in progress');
 
     if (roomRow.bid_deadline && Date.now() > roomRow.bid_deadline) {
       throw new Error('Bid deadline passed');
@@ -121,16 +122,23 @@ export function advanceToNextPlayer(roomId: string) {
 
     if (nextPlayer) {
       const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as unknown as Room | undefined;
-      const player = db.prepare('SELECT base_price_lakhs FROM players WHERE id = ?').get(nextPlayer.player_id) as any;
-      const newDeadline = (room && !room.is_unlimited_timer && room.status === 'IN_PROGRESS') ? Date.now() + (room.bid_timer_seconds * 1000) : null;
+      const isRelisted = db.prepare(`SELECT status FROM auction_queue WHERE room_id = ? AND player_id = ?`).get(roomId, nextPlayer.player_id) as any;
+      const pendingCount = db.prepare(`SELECT COUNT(*) as count FROM auction_queue WHERE room_id = ? AND status = 'PENDING'`).get(roomId) as { count: number };
+      
+      const isFinalRound = pendingCount.count === 0 && isRelisted?.status === 'RELISTED';
+      const effectiveStatus = isFinalRound ? 'FINAL_ROUND' : (room?.status === 'LOBBY' ? 'LIVE' : (room?.status || 'LIVE'));
+      const effectiveTimer = isFinalRound ? Math.min(room?.bid_timer_seconds || 10, 8) : (room?.bid_timer_seconds || 10);
+      const isUnlimited = Boolean(room?.is_unlimited_timer);
+      const isTimedPhase = effectiveStatus === 'LIVE' || effectiveStatus === 'IN_PROGRESS' || effectiveStatus === 'FINAL_ROUND';
+      const newDeadline = (!isUnlimited && isTimedPhase) ? Date.now() + (effectiveTimer * 1000) : null;
 
       db.prepare(`UPDATE auction_queue SET status = 'ACTIVE' WHERE room_id = ? AND player_id = ?`)
         .run(roomId, nextPlayer.player_id);
         
-      db.prepare(`UPDATE rooms SET current_player_id = ?, current_bid_lakhs = 0, current_bidder_franchise = NULL, bid_deadline = ? WHERE id = ?`)
-        .run(nextPlayer.player_id, newDeadline, roomId);
+      db.prepare(`UPDATE rooms SET current_player_id = ?, current_bid_lakhs = 0, current_bidder_franchise = NULL, bid_deadline = ?, status = ? WHERE id = ?`)
+        .run(nextPlayer.player_id, newDeadline, effectiveStatus, roomId);
     } else {
-      db.prepare('UPDATE rooms SET status = ? WHERE id = ?').run('COMPLETED', roomId);
+      db.prepare('UPDATE rooms SET status = ?, completed_at = ? WHERE id = ?').run('COMPLETED', Date.now(), roomId);
     }
   });
   tx();

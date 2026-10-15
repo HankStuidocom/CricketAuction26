@@ -4,10 +4,18 @@
  * and prevents HTML error snippets / Roobert font crash messages.
  */
 
+export const PRODUCTION_BACKEND_URL = 'https://cricket-auction-backend-dtzw.onrender.com';
+
 export const getBackendUrl = (): string => {
   const envUrl = import.meta.env.VITE_BACKEND_URL;
   if (envUrl) return envUrl.replace(/\/$/, '');
-  return '';
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '';
+    }
+    return PRODUCTION_BACKEND_URL;
+  }
+  return PRODUCTION_BACKEND_URL;
 };
 
 export const getSocketUrl = (): string => {
@@ -17,9 +25,9 @@ export const getSocketUrl = (): string => {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       return 'http://localhost:3001';
     }
-    return window.location.origin;
+    return PRODUCTION_BACKEND_URL;
   }
-  return 'http://localhost:3001';
+  return PRODUCTION_BACKEND_URL;
 };
 
 export interface SafeFetchOptions extends RequestInit {
