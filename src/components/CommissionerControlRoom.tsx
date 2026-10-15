@@ -41,6 +41,7 @@ interface Props {
   announcements: any[];
   chatMessages: any[];
   sendChat: (msg: string, sender: string) => void;
+  hostEndAuction?: (resolution?: 'sell' | 'unsold' | 'cancel') => void;
   onNavigateResults: () => void;
 }
 
@@ -63,12 +64,14 @@ export default function CommissionerControlRoom({
   announcements,
   chatMessages,
   sendChat,
+  hostEndAuction,
   onNavigateResults
 }: Props) {
   const [activeBoardTab, setActiveBoardTab] = useState<'queue' | 'relisted' | 'unsold' | 'teams' | 'sold'>('queue');
   const [announcementText, setAnnouncementText] = useState('');
   const [timerSeconds, setTimerSeconds] = useState(roomState?.bid_timer_seconds || 10);
   const [unlimitedTimer, setUnlimitedTimer] = useState(Boolean(roomState?.is_unlimited_timer));
+  const [isEnding, setIsEnding] = useState(false);
 
   // Modal confirmations for destructive commissioner actions
   const [confirmModal, setConfirmModal] = useState<{
@@ -86,15 +89,26 @@ export default function CommissionerControlRoom({
     setAnnouncementText('');
   };
 
-  const executeConfirmedAction = () => {
-    if (confirmModal.type === 'unsold') {
-      hostAction('mark_unsold');
-    } else if (confirmModal.type === 'kick' && confirmModal.targetId) {
-      kickPlayer(confirmModal.targetId);
-    } else if (confirmModal.type === 'end') {
+  const handleEndWithResolution = (resolution?: 'sell' | 'unsold' | 'cancel') => {
+    setIsEnding(true);
+    if (hostEndAuction) {
+      hostEndAuction(resolution);
+    } else {
       onNavigateResults();
     }
     setConfirmModal({ open: false, type: 'unsold' });
+  };
+
+  const executeConfirmedAction = () => {
+    if (confirmModal.type === 'unsold') {
+      hostAction('mark_unsold');
+      setConfirmModal({ open: false, type: 'unsold' });
+    } else if (confirmModal.type === 'kick' && confirmModal.targetId) {
+      kickPlayer(confirmModal.targetId);
+      setConfirmModal({ open: false, type: 'unsold' });
+    } else if (confirmModal.type === 'end') {
+      handleEndWithResolution();
+    }
   };
 
   const upcomingList = roomState?.upcoming_list || [];
@@ -114,12 +128,54 @@ export default function CommissionerControlRoom({
               <h3 className="font-display font-black text-lg text-white uppercase tracking-tight">
                 {confirmModal.type === 'unsold' && 'Confirm Mark Unsold'}
                 {confirmModal.type === 'kick' && 'Confirm Player Removal'}
-                {confirmModal.type === 'end' && 'Confirm End Tournament'}
+                {confirmModal.type === 'end' && 'Conclude Auction & Mint Rosters'}
               </h3>
             </div>
+            
             <p className="text-xs text-[#86948A] leading-relaxed">
               {confirmModal.message}
             </p>
+
+            {/* Special Active Lot Settlement Deck when ending auction */}
+            {confirmModal.type === 'end' && activePlayerDetails && (
+              <div className="p-3 bg-[#0F131C] border border-[#F59E0B]/30 rounded-[6px] space-y-2">
+                <span className="text-[10px] font-mono font-bold text-[#FFB95F] uppercase tracking-wider block">
+                  Active Lot Under Hammer: {activePlayerDetails.player_name}
+                </span>
+                <p className="text-[11px] text-[#DFE2EF] leading-relaxed">
+                  Choose how to settle this player card before ending the tournament:
+                </p>
+                <div className="grid grid-cols-1 gap-2 pt-1">
+                  {currentBidder && currentBid > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleEndWithResolution('sell')}
+                      className="w-full px-3 py-2 rounded-[4px] bg-[#10B981]/20 hover:bg-[#10B981]/30 border border-[#10B981]/50 text-xs font-mono font-bold text-[#10B981] flex items-center justify-between transition"
+                    >
+                      <span>Hammer to {currentBidder}</span>
+                      <span className="text-white">{formatCr(currentBid)}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleEndWithResolution('unsold')}
+                    className="w-full px-3 py-2 rounded-[4px] bg-[#EF4444]/20 hover:bg-[#EF4444]/30 border border-[#EF4444]/50 text-xs font-mono font-bold text-[#FFB4AB] flex items-center justify-between transition"
+                  >
+                    <span>Mark as Unsold</span>
+                    <span className="text-[10px] text-[#86948A]">Move to Unsold</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEndWithResolution('cancel')}
+                    className="w-full px-3 py-2 rounded-[4px] bg-[#1C1F29] hover:bg-[#262A34] border border-[#1F2937] text-xs font-mono font-bold text-[#DFE2EF] flex items-center justify-between transition"
+                  >
+                    <span>Cancel Active Card</span>
+                    <span className="text-[10px] text-[#86948A]">Discard without sale</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2.5 pt-2 border-t border-[#1F2937]">
               <button
                 type="button"
@@ -128,13 +184,24 @@ export default function CommissionerControlRoom({
               >
                 CANCEL
               </button>
-              <button
-                type="button"
-                onClick={executeConfirmedAction}
-                className="px-5 py-2 rounded-[4px] bg-[#EF4444] hover:bg-[#DC2626] text-xs font-display font-black text-white uppercase tracking-wider transition shadow-lg"
-              >
-                CONFIRM ACTION
-              </button>
+              {confirmModal.type !== 'end' && (
+                <button
+                  type="button"
+                  onClick={executeConfirmedAction}
+                  className="px-5 py-2 rounded-[4px] bg-[#EF4444] hover:bg-[#DC2626] text-xs font-display font-black text-white uppercase tracking-wider transition shadow-lg"
+                >
+                  CONFIRM ACTION
+                </button>
+              )}
+              {confirmModal.type === 'end' && !activePlayerDetails && (
+                <button
+                  type="button"
+                  onClick={() => handleEndWithResolution()}
+                  className="px-5 py-2 rounded-[4px] bg-[#F59E0B] hover:bg-[#FFB95F] text-xs font-display font-black text-[#090D16] uppercase tracking-wider transition shadow-lg"
+                >
+                  CONCLUDE AUCTION
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -73,7 +73,7 @@ export function calculateAIMaxValuation(player: Player, participant: RoomPartici
 export function makeAIDecision(roomCode: string, franchiseId: string): AIDecision | null {
   const normCode = (roomCode || '').trim().toUpperCase();
   const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normCode) as unknown as Room | undefined;
-  if (!room || room.status !== 'IN_PROGRESS' || !room.current_player_id) return null;
+  if (!room || !['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(room.status) || !room.current_player_id) return null;
   
   const participant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ? AND is_ai = 1')
     .get(room.id, franchiseId) as unknown as RoomParticipant | undefined;
@@ -128,7 +128,7 @@ export function makeAIDecision(roomCode: string, franchiseId: string): AIDecisio
 export function processAIBids(roomCode: string, onBidPlaced?: () => void): boolean {
   const normCode = (roomCode || '').trim().toUpperCase();
   const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normCode) as unknown as Room | undefined;
-  if (!room || room.status !== 'IN_PROGRESS') return false;
+  if (!room || !['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(room.status)) return false;
   
   const aiParticipants = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND is_ai = 1')
     .all(room.id) as unknown as RoomParticipant[];

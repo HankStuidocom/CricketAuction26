@@ -9,7 +9,7 @@ import { Room, RoomParticipant } from '../types';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret2026';
 
-function buildFullRoomState(roomCode: string) {
+export function buildFullRoomState(roomCode: string) {
   const normCode = (roomCode || '').trim().toUpperCase();
   const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normCode) as unknown as Room | undefined;
   if (!room) return null;
@@ -71,6 +71,24 @@ function buildFullRoomState(roomCode: string) {
     SELECT status, COUNT(*) as count FROM auction_queue WHERE room_id = ? GROUP BY status
   `).all(room.id);
 
+  const announcements = db.prepare(`
+    SELECT * FROM auction_events 
+    WHERE room_id = ? AND event_type = 'announcement' 
+    ORDER BY created_at DESC LIMIT 10
+  `).all(room.id).map((ev: any) => {
+    try {
+      const parsed = JSON.parse(ev.payload);
+      return {
+        id: ev.id,
+        message: parsed.message,
+        sender: 'AUCTION COMMISSIONER',
+        timestamp: ev.created_at
+      };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+
   const sanitizedRoom = { ...room };
   delete (sanitizedRoom as any).password_hash;
   (sanitizedRoom as any).has_password = Boolean(room.password_hash);
@@ -83,11 +101,12 @@ function buildFullRoomState(roomCode: string) {
     unsold_list: unsoldList,
     upcoming_list: upcomingList,
     activity_feed: activityFeed,
-    queue_summary: queueSummary
+    queue_summary: queueSummary,
+    announcements: announcements
   };
 }
 
-function emitRoomState(io: Server, roomCode: string) {
+export function emitRoomState(io: Server, roomCode: string) {
   const normCode = (roomCode || '').trim().toUpperCase();
   const state = buildFullRoomState(normCode);
   if (state) {
@@ -107,7 +126,7 @@ function scheduleAIBidding(io: Server, roomCode: string) {
   const delay = 800 + Math.floor(Math.random() * 1000);
   setTimeout(() => {
     const room = db.prepare('SELECT status FROM rooms WHERE UPPER(room_code) = ?').get(normCode) as any;
-    if (!room || room.status !== 'IN_PROGRESS') return;
+    if (!room || !['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(room.status)) return;
 
     const placed = processAIBids(normCode, () => {
       emitRoomState(io, normCode);
@@ -119,8 +138,13 @@ function scheduleAIBidding(io: Server, roomCode: string) {
   }, delay);
 }
 
-function checkHostAuthority(room: any, callerUserId: string | undefined): boolean {
+function checkHostAuthority(room: any, socket: Socket): boolean {
+  const callerUserId = socket.data.userId;
   if (!callerUserId) return false;
+  const isRegisteredHost = Boolean(db.prepare('SELECT id FROM users WHERE id = ?').get(room.host_id));
+  if (isRegisteredHost && room.host_id === callerUserId) {
+    if (socket.data.authUserId !== room.host_id) return false;
+  }
   if (room.host_id === callerUserId) return true;
   const hostParticipant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, callerUserId) as any;
   return Boolean(hostParticipant && hostParticipant.is_host);
@@ -159,7 +183,19 @@ export function setupSocketHandlers(io: Server) {
         });
       }
 
-      const effectiveUserId = socket.data.authUserId || userId;
+      const isRegisteredHost = Boolean(db.prepare('SELECT id FROM users WHERE id = ?').get(room.host_id));
+      let effectiveUserId = socket.data.authUserId || userId;
+
+      // Impersonation protection: prevent unauthenticated clients from spoofing a registered host
+      if (isRegisteredHost && (userId === room.host_id || effectiveUserId === room.host_id)) {
+        if (socket.data.authUserId !== room.host_id) {
+          return socket.emit('join_error', { 
+            code: 'AUTH_REQUIRED', 
+            message: 'Authentication required to access host role for this room' 
+          });
+        }
+      }
+
       socket.data.userId = effectiveUserId;
       socket.data.roomCode = normalizedCode;
 
@@ -202,7 +238,17 @@ export function setupSocketHandlers(io: Server) {
         return;
       }
 
-      // 4. Pure Spectator Join
+      // 4. Private Room Password verification for ALL new joiners (spectators, managers, players)
+      if (room.is_private && room.password_hash) {
+        if (!password || !bcrypt.compareSync(password, room.password_hash)) {
+          return socket.emit('join_error', { 
+            code: 'INVALID_PASSWORD', 
+            message: 'Private-room password is incorrect' 
+          });
+        }
+      }
+
+      // 5. Pure Spectator Join (verified against password)
       if (isSpectator) {
         socket.join(normalizedCode);
         socket.emit('join_handshake_success', {
@@ -218,7 +264,7 @@ export function setupSocketHandlers(io: Server) {
         return;
       }
 
-      // 5. Game Manager Join (for first time host)
+      // 6. Game Manager Join (for first time host)
       if (isManager && isHostUser && room.host_franchise === 'ADMIN') {
         socket.join(normalizedCode);
         socket.emit('join_handshake_success', {
@@ -232,16 +278,6 @@ export function setupSocketHandlers(io: Server) {
         socket.emit('room_joined', { room, participant: null, isManager: true });
         emitRoomState(io, normalizedCode);
         return;
-      }
-
-      // 6. Private Room Password verification for new joiners
-      if (room.is_private && room.password_hash) {
-        if (!password || !bcrypt.compareSync(password, room.password_hash)) {
-          return socket.emit('join_error', { 
-            code: 'INVALID_PASSWORD', 
-            message: 'Private-room password is incorrect' 
-          });
-        }
       }
 
       // 7. Check if Auction has already started
@@ -351,13 +387,12 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('start_auction', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return socket.emit('error', { message: 'Room not found' });
 
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) {
+      if (!checkHostAuthority(room, socket)) {
         return socket.emit('error', { message: 'Only host or commissioner can start the auction' });
       }
 
@@ -391,7 +426,7 @@ export function setupSocketHandlers(io: Server) {
         const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as any;
         if (!room) throw new Error('Room not found');
 
-        const callerUserId = socket.data.userId || data.userId;
+        const callerUserId = socket.data.userId;
 
         // Fairness rule: Commissioner / Game Manager cannot participate in franchise bidding
         if (room.host_id === callerUserId && room.host_franchise === 'ADMIN') {
@@ -440,13 +475,12 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_pause', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
       
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can pause' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can pause' });
 
       db.prepare('UPDATE rooms SET status = "PAUSED", bid_deadline = NULL WHERE id = ?').run(room.id);
       logEvent(room.id, 'paused', { by: room.host_franchise });
@@ -455,13 +489,12 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_resume', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
       
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can resume' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can resume' });
 
       const pendingCount = db.prepare(`SELECT COUNT(*) as count FROM auction_queue WHERE room_id = ? AND status = 'PENDING'`).get(room.id) as { count: number };
       const resumeStatus = pendingCount.count === 0 ? 'FINAL_ROUND' : 'LIVE';
@@ -475,13 +508,12 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_skip', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
       
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can skip' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can skip' });
 
       finalizeCurrent(room.id);
       advanceToNextPlayer(room.id);
@@ -492,13 +524,12 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_defer_current', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
       
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can defer a card' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can defer a card' });
       if (room.current_bidder_franchise) return socket.emit('error', { message: 'Cannot defer card while bids are active' });
 
       const deferred = deferCurrentPlayer(room.id, 5);
@@ -510,13 +541,12 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_mark_unsold', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
       
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can mark unsold' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can mark unsold' });
 
       db.prepare('UPDATE rooms SET current_bid_lakhs = 0, current_bidder_franchise = NULL WHERE id = ?').run(room.id);
       finalizeCurrent(room.id);
@@ -528,12 +558,11 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_relist_current', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only the host or commissioner can relist a player' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only the host or commissioner can relist a player' });
       if (room.current_bidder_franchise) return socket.emit('error', { message: 'A player with an active bid cannot be relisted' });
 
       const relisted = relistCurrent(room.id);
@@ -545,12 +574,11 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_relist_unsold_player', (data) => {
-      const { roomCode, userId, playerId } = data;
+      const { roomCode, playerId } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only the host or commissioner can relist a player' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only the host or commissioner can relist a player' });
 
       const ok = relistUnsoldPlayer(room.id, playerId);
       if (!ok) return socket.emit('error', { message: 'Could not relist player from unsold pile' });
@@ -559,12 +587,11 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_announcement', (data) => {
-      const { roomCode, userId, message } = data;
+      const { roomCode, message } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only the host or commissioner can broadcast announcements' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only the host or commissioner can broadcast announcements' });
 
       const cleanMsg = (message || '').trim();
       if (!cleanMsg) return;
@@ -579,12 +606,11 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_kick_player', (data) => {
-      const { roomCode, userId, targetUserId } = data;
+      const { roomCode, targetUserId } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only the host or commissioner can manage teams' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only the host or commissioner can manage teams' });
 
       const participant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, targetUserId) as unknown as RoomParticipant | undefined;
       if (!participant || participant.is_host) return socket.emit('error', { message: 'That player cannot be removed' });
@@ -592,18 +618,28 @@ export function setupSocketHandlers(io: Server) {
       // Preserve a squad already won by the player and hand the team to the AI.
       db.prepare(`UPDATE room_participants SET user_id = ?, is_ai = 1, ai_difficulty = ?, display_name = ? WHERE id = ?`)
         .run(`ai-${participant.franchise_id.toLowerCase()}`, room.ai_difficulty || 'MEDIUM', `Arena Bot (${participant.franchise_id})`, participant.id);
-      logEvent(room.id, 'player_kicked', { franchise: participant.franchise_id });
+      
+      // Notify target socket(s) and remove from room channel
+      for (const [id, s] of io.of('/').sockets) {
+        if (s.data.userId === targetUserId && s.rooms.has(normalizedCode)) {
+          s.emit('kicked_from_room', {
+            message: `You were removed from franchise ${participant.franchise_id} by the commissioner.`
+          });
+          s.leave(normalizedCode);
+        }
+      }
+
+      logEvent(room.id, 'player_kicked', { franchise: participant.franchise_id, targetUserId });
       emitRoomState(io, normalizedCode);
       scheduleAIBidding(io, normalizedCode);
     });
 
     socket.on('host_update_settings', (data) => {
-      const { roomCode, userId, bidTimerSeconds, isUnlimitedTimer } = data;
+      const { roomCode, bidTimerSeconds, isUnlimitedTimer } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only the host or commissioner can change auction settings' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only the host or commissioner can change auction settings' });
 
       const timer = Number(bidTimerSeconds);
       if (!Number.isInteger(timer) || timer < 5 || timer > 120) {
@@ -619,29 +655,46 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('host_end_auction', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode, activeCardResolution } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can end the auction' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can end the auction' });
 
-      db.prepare('UPDATE rooms SET status = ?, bid_deadline = NULL WHERE id = ?').run('COMPLETED', room.id);
-      logEvent(room.id, 'auction_ended_by_host', { by: callerUserId });
+      // Settle active lot if one exists
+      if (room.current_player_id) {
+        if (activeCardResolution === 'sell') {
+          if (room.current_bidder_franchise && room.current_bid_lakhs > 0) {
+            finalizeCurrent(room.id);
+          } else {
+            db.prepare(`UPDATE auction_queue SET status = 'UNSOLD' WHERE room_id = ? AND player_id = ?`)
+              .run(room.id, room.current_player_id);
+          }
+        } else if (activeCardResolution === 'unsold') {
+          db.prepare(`UPDATE auction_queue SET status = 'UNSOLD' WHERE room_id = ? AND player_id = ?`)
+            .run(room.id, room.current_player_id);
+        } else if (activeCardResolution === 'cancel') {
+          db.prepare(`UPDATE auction_queue SET status = 'CANCELLED' WHERE room_id = ? AND player_id = ?`)
+            .run(room.id, room.current_player_id);
+        }
+      }
+
+      db.prepare('UPDATE rooms SET status = "COMPLETED", bid_deadline = NULL, current_player_id = NULL, current_bid_lakhs = 0, current_bidder_franchise = NULL, completed_at = ? WHERE id = ?')
+        .run(Date.now(), room.id);
+      logEvent(room.id, 'auction_ended_by_host', { by: socket.data.userId, resolution: activeCardResolution });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('auction_completed', { message: 'Auction concluded by Commissioner' });
     });
 
     socket.on('host_cancel_room', (data) => {
-      const { roomCode, userId } = data;
+      const { roomCode } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      const callerUserId = socket.data.userId || userId;
-      if (!checkHostAuthority(room, callerUserId)) return socket.emit('error', { message: 'Only host or commissioner can cancel the room' });
+      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can cancel the room' });
 
       db.prepare('UPDATE rooms SET status = ?, bid_deadline = NULL WHERE id = ?').run('CANCELLED', room.id);
-      logEvent(room.id, 'room_cancelled', { by: callerUserId });
+      logEvent(room.id, 'room_cancelled', { by: socket.data.userId });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('room_cancelled', { message: 'Room has been cancelled by host' });
     });

@@ -52,6 +52,8 @@ export default function LiveAuction() {
     connected, 
     chatMessages, 
     announcements,
+    currentFranchise,
+    isKicked,
     placeBid, 
     hostAction, 
     deferCurrentPlayer,
@@ -59,8 +61,19 @@ export default function LiveAuction() {
     sendAnnouncement,
     sendChat, 
     kickPlayer, 
-    updateAuctionSettings 
+    updateAuctionSettings,
+    hostEndAuction
   } = useAuction(code || '', myFranchise, myUserId, isSpectator, isManager);
+
+  const activeFranchise = currentFranchise || myFranchise;
+
+  // Redirect if kicked by host/commissioner
+  useEffect(() => {
+    if (isKicked) {
+      const timer = setTimeout(() => navigate('/'), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isKicked, navigate]);
 
   const [timeLeft, setTimeLeft] = useState(0);
   const [activeTab, setActiveTab] = useState<'teams' | 'chat' | 'manager'>('teams');
@@ -101,7 +114,7 @@ export default function LiveAuction() {
 
   const currentBid = roomState?.current_bid_lakhs || 0;
   const currentBidder = roomState?.current_bidder_franchise;
-  const isHighestBidder = currentBidder === myFranchise;
+  const isHighestBidder = currentBidder === activeFranchise;
   const isPaused = roomState?.status === 'PAUSED';
   const isHost = roomState?.host_id === myUserId;
 
@@ -125,12 +138,12 @@ export default function LiveAuction() {
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
-    sendChat(chatInput, `${myDisplayName} (${myFranchise})`);
+    sendChat(chatInput, `${myDisplayName} (${activeFranchise})`);
     setChatInput('');
   };
 
-  const myParticipant = roomState?.participants?.find((p: any) => p.franchise_id === myFranchise);
-  const myTeamData = FRANCHISE_MAP[myFranchise] || ALL_FRANCHISES[0];
+  const myParticipant = roomState?.participants?.find((p: any) => p.franchise_id === activeFranchise);
+  const myTeamData = FRANCHISE_MAP[activeFranchise] || ALL_FRANCHISES[0];
 
   const currentSquadCount = myParticipant?.squad_count || 0;
   const maxSquad = roomState?.max_squad_size || 10;
@@ -191,6 +204,7 @@ export default function LiveAuction() {
             announcements={announcements}
             chatMessages={chatMessages}
             sendChat={sendChat}
+            hostEndAuction={hostEndAuction}
             onNavigateResults={() => navigate(`/room/${code}/results`)}
           />
         </div>
@@ -507,8 +521,9 @@ export default function LiveAuction() {
                 </button>
 
                 <button
-                  onClick={() => navigate(`/room/${code}/results`)}
+                  onClick={() => hostEndAuction()}
                   className="p-2 bg-[#0F131C] hover:bg-[#1A2234] rounded-[4px] text-[10px] font-bold font-['Outfit'] flex flex-col items-center gap-1 border border-[#F59E0B]/40 text-[#FFB95F] transition active:scale-95"
+                  title="Conclude auction and mint rosters"
                 >
                   <TrophyCupIcon size={14} color="#F59E0B" />
                   <span>Results</span>

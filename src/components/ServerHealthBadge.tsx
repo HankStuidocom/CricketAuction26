@@ -19,6 +19,8 @@ export function ServerHealthBadge({
   const [latency, setLatency] = useState<number | null>(null);
   const [lastChecked, setLastChecked] = useState<number>(Date.now());
   const [isPinging, setIsPinging] = useState(false);
+  const consecutiveWaking = React.useRef(0);
+  const firstWakingTime = React.useRef<number | null>(null);
 
   const checkHealth = useCallback(async () => {
     setIsPinging(true);
@@ -40,18 +42,36 @@ export function ServerHealthBadge({
       const elapsed = Math.round(performance.now() - start);
 
       if (res.ok) {
+        consecutiveWaking.current = 0;
+        firstWakingTime.current = null;
         setStatus('online');
         setLatency(elapsed);
       } else if (res.status === 502 || res.status === 503 || res.status === 504) {
-        setStatus('waking');
+        consecutiveWaking.current += 1;
+        if (!firstWakingTime.current) firstWakingTime.current = Date.now();
+        const elapsedWaking = Date.now() - firstWakingTime.current;
+        if (consecutiveWaking.current >= 4 || elapsedWaking > 40000) {
+          setStatus('offline');
+        } else {
+          setStatus('waking');
+        }
         setLatency(null);
       } else {
+        consecutiveWaking.current = 0;
+        firstWakingTime.current = null;
         setStatus('offline');
         setLatency(null);
       }
     } catch {
       // Aborted or network failure (often cold start on free Render instance)
-      setStatus('waking');
+      consecutiveWaking.current += 1;
+      if (!firstWakingTime.current) firstWakingTime.current = Date.now();
+      const elapsedWaking = Date.now() - firstWakingTime.current;
+      if (consecutiveWaking.current >= 4 || elapsedWaking > 40000) {
+        setStatus('offline');
+      } else {
+        setStatus('waking');
+      }
       setLatency(null);
     } finally {
       setIsPinging(false);

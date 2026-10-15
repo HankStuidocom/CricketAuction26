@@ -1,21 +1,44 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import db from '../database/db';
 import { importPlayersFromExcel } from '../services/importPlayers';
 
 const router = Router();
-const ADMIN_SECRET = process.env.ADMIN_KEY || 'ca26_super_admin_secret_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecret2026';
+const ADMIN_KEY = process.env.ADMIN_KEY;
 
 // Middleware to guard mutation routes against unauthorized access
 function requireAdminAuth(req: any, res: any, next: any) {
+  // 1. Check dedicated Admin Secret Header if configured
   const adminKey = req.headers['x-admin-key'];
+  if (ADMIN_KEY && adminKey === ADMIN_KEY) {
+    return next();
+  }
+
+  // 2. Check verified Admin JWT Bearer Token
   const authHeader = req.headers.authorization;
-  if (adminKey === ADMIN_SECRET) {
-    return next();
-  }
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return next();
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      if (decoded && (decoded.isAdmin || decoded.role === 'admin' || decoded.username === 'admin')) {
+        req.adminUser = decoded;
+        return next();
+      }
+      // Check database if user account has admin privileges
+      if (decoded?.id) {
+        const user = db.prepare('SELECT username, rank_name FROM users WHERE id = ?').get(decoded.id) as any;
+        if (user && (user.username === 'admin' || user.rank_name === 'Admin' || user.rank_name === 'Commissioner')) {
+          req.adminUser = user;
+          return next();
+        }
+      }
+    } catch {
+      return res.status(401).json({ error: 'Unauthorized: Invalid or expired admin token' });
+    }
   }
-  return res.status(401).json({ error: 'Unauthorized: Admin authentication required' });
+
+  return res.status(401).json({ error: 'Unauthorized: Valid Admin credentials or verified Admin JWT required' });
 }
 
 router.get('/players', (req, res) => {

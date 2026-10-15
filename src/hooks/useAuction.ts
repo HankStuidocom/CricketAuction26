@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { getSocketUrl } from '../lib/api';
-import { getRoomSession } from '../lib/utils';
+import { getRoomSession, saveRoomSession } from '../lib/utils';
 
 export function useAuction(roomCode: string, myFranchise?: string, myUserId?: string, isSpectator?: boolean, isManager?: boolean) {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -10,6 +10,8 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
   const [connected, setConnected] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [currentFranchise, setCurrentFranchise] = useState<string | undefined>(myFranchise);
+  const [isKicked, setIsKicked] = useState<boolean>(false);
 
   useEffect(() => {
     const token = localStorage.getItem('ca26_token');
@@ -28,7 +30,7 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
         roomCode,
         isSpectator,
         isManager,
-        franchise: isManager ? undefined : myFranchise,
+        franchise: isManager ? undefined : (currentFranchise || myFranchise),
         userId: myUserId || savedSession?.userId || 'guest-' + Math.random().toString(36).substring(7),
         displayName: savedSession?.displayName,
         password: effectivePassword
@@ -40,8 +42,15 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     });
 
     newSocket.on('join_handshake_success', (data) => {
+      if (data.franchise) {
+        setCurrentFranchise(data.franchise);
+        saveRoomSession(roomCode, { ...savedSession, franchise: data.franchise });
+      }
       if (data.room) {
         setRoomState((prev: any) => ({ ...prev, ...data.room }));
+        if (data.room.announcements) {
+          setAnnouncements(data.room.announcements);
+        }
       }
       if (data.notice) {
         setError(data.notice);
@@ -57,8 +66,23 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
       setError(data.message || 'Room was cancelled by the host.');
     });
 
+    newSocket.on('kicked_from_room', (data) => {
+      setError(data.message || 'You were removed from this room by the commissioner.');
+      setIsKicked(true);
+    });
+
     newSocket.on('room_state', (state) => {
       setRoomState(state);
+      if (state.announcements && state.announcements.length > 0) {
+        setAnnouncements(state.announcements);
+      }
+      if (myUserId) {
+        const mySlot = state.participants?.find((p: any) => p.user_id === myUserId);
+        if (mySlot?.franchise_id && mySlot.franchise_id !== currentFranchise) {
+          setCurrentFranchise(mySlot.franchise_id);
+          saveRoomSession(roomCode, { ...savedSession, franchise: mySlot.franchise_id });
+        }
+      }
     });
 
     newSocket.on('bid_rejected', (data) => {
@@ -71,7 +95,7 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     });
 
     newSocket.on('commissioner_announcement', (ann) => {
-      setAnnouncements((prev) => [ann, ...prev].slice(0, 5));
+      setAnnouncements((prev) => [ann, ...prev.filter(a => a.id !== ann.id)].slice(0, 10));
     });
 
     newSocket.on('error', (err) => {
@@ -83,17 +107,19 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     };
   }, [roomCode, myFranchise, myUserId, isSpectator, isManager]);
 
+  const activeFranchise = currentFranchise || myFranchise;
+
   const placeBid = useCallback((amount?: number) => {
-    if (socket && roomCode && myFranchise) {
+    if (socket && roomCode && activeFranchise) {
       socket.emit('place_bid', {
         roomCode,
-        franchise: myFranchise,
+        franchise: activeFranchise,
         userId: myUserId,
         amount,
-        idempotencyKey: `${roomCode}-${myFranchise}-${Date.now()}`
+        idempotencyKey: `${roomCode}-${activeFranchise}-${Date.now()}`
       });
     }
-  }, [socket, roomCode, myFranchise, myUserId]);
+  }, [socket, roomCode, activeFranchise, myUserId]);
 
   const hostAction = useCallback((action: 'pause' | 'resume' | 'skip' | 'mark_unsold' | 'relist_current') => {
     if (socket && roomCode && myUserId) {
@@ -135,9 +161,9 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     }
   }, [socket, roomCode]);
 
-  const hostEndAuction = useCallback(() => {
+  const hostEndAuction = useCallback((activeCardResolution?: 'sell' | 'unsold' | 'cancel') => {
     if (socket && roomCode && myUserId) {
-      socket.emit('host_end_auction', { roomCode, userId: myUserId });
+      socket.emit('host_end_auction', { roomCode, userId: myUserId, activeCardResolution });
     }
   }, [socket, roomCode, myUserId]);
 
@@ -154,6 +180,8 @@ export function useAuction(roomCode: string, myFranchise?: string, myUserId?: st
     connected,
     chatMessages,
     announcements,
+    currentFranchise: activeFranchise,
+    isKicked,
     placeBid,
     hostAction,
     deferCurrentPlayer,

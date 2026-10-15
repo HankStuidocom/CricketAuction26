@@ -42,6 +42,8 @@ class PersistentDatabase {
 
     const SQL = await initSqlJs();
     let loadedBuffer: Buffer | null = null;
+    let postgresQuerySucceeded = false;
+    const postgresConfigured = Boolean(DATABASE_URL);
 
     // 2. Try restoring latest snapshot directly from Postgres
     if (this.pgPool) {
@@ -50,9 +52,12 @@ class PersistentDatabase {
           'SELECT payload, updated_at FROM system_snapshots WHERE id = $1',
           ['auction_db']
         );
+        postgresQuerySucceeded = true;
         if (res.rows.length > 0 && res.rows[0].payload) {
           loadedBuffer = res.rows[0].payload;
           console.log(`[Postgres] Restored auction database snapshot (${loadedBuffer?.length} bytes, updated: ${new Date(Number(res.rows[0].updated_at)).toISOString()})`);
+        } else {
+          console.log('[Postgres] No existing snapshot found in system_snapshots (fresh database deployment)');
         }
       } catch (err: any) {
         console.error('[Postgres] Failed to retrieve snapshot from database:', err.message);
@@ -82,12 +87,41 @@ class PersistentDatabase {
       } catch (err: any) {
         console.warn('[Database] Snapshot mounting failed, initializing fresh instance:', err.message);
         this.db = new SQL.Database();
-        this.persist();
+        if (!postgresConfigured || postgresQuerySucceeded) {
+          this.persist();
+        }
       }
     } else {
       this.db = new SQL.Database();
       console.log('[Database] Initialized new clean database instance');
-      this.persist();
+      if (postgresConfigured && !postgresQuerySucceeded) {
+        console.warn('[Postgres] CRITICAL: Snapshot fetch failed on boot. SKIPPING persist to prevent overwriting existing data with blank database.');
+      } else {
+        this.persist();
+      }
+    }
+  }
+
+  public async flushToPostgres(): Promise<void> {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+    if (!this.db) return;
+    try {
+      const data = this.db.export();
+      const buffer = Buffer.from(data);
+      if (this.pgPool) {
+        await this.pgPool.query(
+          `INSERT INTO system_snapshots (id, payload, updated_at)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at`,
+          ['auction_db', buffer, Date.now()]
+        );
+        console.log('[Postgres] Flushed database snapshot on shutdown successfully');
+      }
+    } catch (err: any) {
+      console.error('[Postgres] Flush on shutdown failed:', err.message);
     }
   }
 

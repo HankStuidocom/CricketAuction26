@@ -24,8 +24,23 @@ const io = new Server(httpServer, {
   cors: corsOptions
 });
 
+app.set('io', io);
+
 app.use(cors(corsOptions));
 app.use(express.json());
+
+const gracefulShutdown = async (signal: string) => {
+  console.log(`[Shutdown] Received ${signal}, flushing persistent database state...`);
+  try {
+    await db.flushToPostgres();
+  } catch (err: any) {
+    console.error('[Shutdown] Flush error:', err.message);
+  }
+  process.exit(0);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Health Check Endpoint
 app.get('/api/health', (req: Request, res: Response) => {

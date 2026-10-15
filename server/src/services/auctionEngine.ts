@@ -191,12 +191,27 @@ export function deferCurrentPlayer(roomId: string, bumpPositions = 5) {
     const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as unknown as Room | undefined;
     if (!room || !room.current_player_id) return null;
 
-    const currentItem = db.prepare(`SELECT queue_position FROM auction_queue WHERE room_id = ? AND player_id = ?`)
-      .get(roomId, room.current_player_id) as any;
-    const targetPos = (currentItem?.queue_position || 0) + bumpPositions + 0.5;
+    const playerId = room.current_player_id;
+    // Get all pending items in current order (excluding deferred player)
+    const pendingItems = db.prepare(`
+      SELECT player_id FROM auction_queue
+      WHERE room_id = ? AND status = 'PENDING' AND player_id != ?
+      ORDER BY queue_position ASC
+    `).all(roomId, playerId) as { player_id: string }[];
 
-    db.prepare(`UPDATE auction_queue SET status = 'PENDING', queue_position = ? WHERE room_id = ? AND player_id = ?`)
-      .run(targetPos, room.id, room.current_player_id);
+    // Insert deferred player after bumpPositions (or at end if fewer pending)
+    const insertIdx = Math.min(bumpPositions, pendingItems.length);
+    pendingItems.splice(insertIdx, 0, { player_id: playerId });
+
+    // Mark deferred player back to PENDING status
+    db.prepare(`UPDATE auction_queue SET status = 'PENDING' WHERE room_id = ? AND player_id = ?`)
+      .run(roomId, playerId);
+
+    // Reindex all pending items with clean sequential integers (0, 1, 2...)
+    const updateStmt = db.prepare(`UPDATE auction_queue SET queue_position = ? WHERE room_id = ? AND player_id = ?`);
+    pendingItems.forEach((item, index) => {
+      updateStmt.run(index, roomId, item.player_id);
+    });
 
     db.prepare(`
       UPDATE rooms

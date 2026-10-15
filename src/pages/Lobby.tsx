@@ -101,6 +101,11 @@ export default function Lobby() {
       setError(data.message || 'Room was cancelled by the host.');
     });
 
+    s.on('kicked_from_room', (data) => {
+      setError(data.message || 'You were removed from this room by the commissioner.');
+      setTimeout(() => navigate('/'), 3000);
+    });
+
     s.on('room_joined', (data) => {
       if (data.room) setRoom(data.room);
       // Confirm our actual franchise from server

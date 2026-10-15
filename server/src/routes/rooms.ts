@@ -2,18 +2,21 @@ import { Router } from 'express';
 import db from '../database/db';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { advanceToNextPlayer } from '../services/auctionEngine';
+import { emitRoomState, buildFullRoomState } from '../socket/roomHandlers';
 import { Room } from '../types';
 
 const router = Router();
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecret2026';
 
 // List public rooms (with optional live filter and full leaderboard/purse enrichment)
 router.get('/', (req, res) => {
   try {
-    const liveOnly = req.query.live === 'true' || req.query.status === 'IN_PROGRESS';
+    const liveOnly = req.query.live === 'true' || req.query.status === 'IN_PROGRESS' || req.query.status === 'LIVE';
     let query = 'SELECT * FROM rooms WHERE is_private = 0';
     if (liveOnly) {
-      query += ' AND status = "IN_PROGRESS"';
+      query += ' AND status IN ("IN_PROGRESS", "LIVE", "FINAL_ROUND")';
     }
     query += ' ORDER BY created_at DESC LIMIT 50';
     const rooms = db.prepare(query).all() as any[];
@@ -213,6 +216,29 @@ router.post('/:code/start', (req, res) => {
     const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(code) as unknown as Room | undefined;
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
+    // Verify caller has host authority
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    let authUserId: string | null = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        authUserId = decoded.id;
+      } catch {}
+    }
+
+    const callerUserId = authUserId || req.body.userId || req.body.hostId;
+    const isRegisteredHost = Boolean(db.prepare('SELECT id FROM users WHERE id = ?').get(room.host_id));
+    if (isRegisteredHost) {
+      if (authUserId !== room.host_id) {
+        return res.status(403).json({ error: 'Forbidden: host authentication required to start auction' });
+      }
+    } else {
+      if (callerUserId !== room.host_id) {
+        return res.status(403).json({ error: 'Forbidden: only the room host can start the auction' });
+      }
+    }
+
     // Initialize AI teams if enabled
     if (room.ai_enabled) {
       const { initializeAITeams } = require('../services/aiBidding');
@@ -224,9 +250,15 @@ router.post('/:code/start', (req, res) => {
       });
     }
 
-    db.prepare('UPDATE rooms SET status = "IN_PROGRESS", auction_started_at = ? WHERE id = ?').run(Date.now(), room.id);
+    db.prepare('UPDATE rooms SET status = "LIVE", auction_started_at = ? WHERE id = ?').run(Date.now(), room.id);
     if (!room.current_player_id) {
       advanceToNextPlayer(room.id);
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      emitRoomState(io, code);
+      io.to(code).emit('auction_started', { room: buildFullRoomState(code) });
     }
 
     const updatedRoom = db.prepare('SELECT * FROM rooms WHERE id = ?').get(room.id);
