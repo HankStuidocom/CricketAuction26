@@ -5,6 +5,9 @@ import db from '../database/db';
 
 export function importPlayersFromExcel(): { total: number, imported: number, skipped: number, errors: number } {
   const possiblePaths = [
+    path.resolve(__dirname, '../../data/IPL_2026_Auction_Player_List.xlsx'),
+    path.resolve(process.cwd(), 'data/IPL_2026_Auction_Player_List.xlsx'),
+    path.resolve(process.cwd(), 'server/data/IPL_2026_Auction_Player_List.xlsx'),
     path.resolve(__dirname, '../../../../Player List/IPL_2026_Auction_Player_List.xlsx'),
     path.resolve(__dirname, '../../../Player List/IPL_2026_Auction_Player_List.xlsx'),
     path.resolve(process.cwd(), '../Player List/IPL_2026_Auction_Player_List.xlsx'),
@@ -20,22 +23,42 @@ export function importPlayersFromExcel(): { total: number, imported: number, ski
     }
   }
 
-  if (!filePath) {
-    console.error('Failed to locate Excel file in any candidate path:', possiblePaths);
-    return { total: 0, imported: 0, skipped: 0, errors: 1 };
+  let data: any[] = [];
+  if (filePath) {
+    try {
+      const workbook = xlsx.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      data = xlsx.utils.sheet_to_json(worksheet) as any[];
+      console.log(`Loaded ${data.length} players from Excel file: ${filePath}`);
+    } catch (error) {
+      console.error('Failed to read Excel file, will try bundled JSON fallback:', error);
+    }
   }
 
-  let workbook;
-  try {
-    workbook = xlsx.readFile(filePath);
-  } catch (error) {
-    console.error('Failed to read Excel file:', error);
-    return { total: 0, imported: 0, skipped: 0, errors: 1 };
+  if (!data || data.length === 0) {
+    const jsonFallbackPaths = [
+      path.resolve(__dirname, '../data/defaultPlayers.json'),
+      path.resolve(process.cwd(), 'src/data/defaultPlayers.json'),
+      path.resolve(process.cwd(), 'server/src/data/defaultPlayers.json')
+    ];
+    for (const jp of jsonFallbackPaths) {
+      if (fs.existsSync(jp)) {
+        try {
+          data = JSON.parse(fs.readFileSync(jp, 'utf8'));
+          console.log(`Loaded ${data.length} players from bundled JSON: ${jp}`);
+          break;
+        } catch (jerr) {
+          console.error(`Failed parsing ${jp}:`, jerr);
+        }
+      }
+    }
   }
 
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  const data = xlsx.utils.sheet_to_json(worksheet) as any[];
+  if (!data || data.length === 0) {
+    console.error('Failed to locate Excel or JSON player datasets in any path.');
+    return { total: 0, imported: 0, skipped: 0, errors: 1 };
+  }
 
   let imported = 0;
   let skipped = 0;
