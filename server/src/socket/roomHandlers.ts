@@ -424,6 +424,12 @@ export function setupSocketHandlers(io: Server) {
         
         logEvent(updatedRoom.id, 'bid', { franchise, amount: bidAmount });
         emitRoomState(io, normalizedCode);
+        io.to(normalizedCode).emit('bid_accepted', {
+          bidder: franchise,
+          newBid: bidAmount,
+          nextValidBid: getNextValidBid(bidAmount),
+          deadline: updatedRoom.bid_deadline
+        });
 
         // Schedule AI response
         scheduleAIBidding(io, normalizedCode);
