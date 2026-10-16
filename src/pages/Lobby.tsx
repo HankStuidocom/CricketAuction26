@@ -10,7 +10,8 @@ import {
   CrownHostIcon, 
   TacticalChatIcon, 
   PlayArrowIcon, 
-  ShareInviteIcon 
+  ShareInviteIcon,
+  BotsAiIcon
 } from '../components/GameIcons';
 import { ArrowLeft, Copy, Check, AlertCircle, RefreshCw, UserPlus, X, Users } from 'lucide-react';
 import { ServerHealthBadge } from '../components/ServerHealthBadge';
@@ -36,10 +37,11 @@ export default function Lobby() {
   const [inviteStatusMsg, setInviteStatusMsg] = useState<string | null>(null);
 
   const savedSession = getRoomSession(code || '');
-  const passedFranchise = location.state?.franchise || savedSession.franchise || 'CSK';
+  const passedFranchise = location.state?.franchise || savedSession.franchise || '';
   const passedDisplayName = location.state?.displayName || savedSession.displayName || 'Player';
   const passedPassword = location.state?.password || savedSession.password;
   const initialUserId = location.state?.userId || savedSession.userId || getOrCreateUserId();
+  const passedHostToken = location.state?.hostToken || (savedSession as any)?.hostToken || localStorage.getItem(`ca26_host_token_${code?.toUpperCase()}`) || undefined;
 
   const [myUserId] = useState<string>(initialUserId);
   // Track the user's current franchise (can change during lobby)
@@ -48,19 +50,26 @@ export default function Lobby() {
   const isGameManager = myFranchise === 'ADMIN';
 
   useEffect(() => {
-    saveRoomSession(code || '', {
-      franchise: myFranchise,
-      displayName: passedDisplayName,
-      userId: initialUserId,
-      password: passedPassword
-    });
+    if (myFranchise) {
+      saveRoomSession(code || '', {
+        franchise: myFranchise,
+        displayName: passedDisplayName,
+        userId: initialUserId,
+        password: passedPassword
+      });
+    }
   }, [code, myFranchise, passedDisplayName, initialUserId, passedPassword]);
 
   useEffect(() => {
     fetchRoomDetails();
 
     const token = localStorage.getItem('ca26_token');
-    const s = io(getSocketUrl(), { auth: { token } });
+    const s = io(getSocketUrl(), { 
+      auth: { 
+        token,
+        hostToken: passedHostToken
+      } 
+    });
     setSocket(s);
     socketRef.current = s;
 
@@ -68,10 +77,11 @@ export default function Lobby() {
       s.emit('join_room', {
         roomCode: code,
         userId: myUserId,
-        franchise: isGameManager ? undefined : myFranchise,
+        franchise: isGameManager ? undefined : (myFranchise || undefined),
         displayName: passedDisplayName,
         password: passedPassword,
-        isManager: isGameManager
+        isManager: isGameManager,
+        hostToken: passedHostToken
       });
     });
 
@@ -252,6 +262,7 @@ export default function Lobby() {
   const isHost = room?.host_id === myUserId;
   const isLobby = room?.status === 'LOBBY';
   const participantCount = room?.participants?.length || 0;
+  const aiCount = room?.participants?.filter((p: any) => p.is_ai).length || 0;
 
   const handleSwitchFranchise = (newFranchise: string) => {
     if (!socket || !code || !myUserId) return;
@@ -272,7 +283,24 @@ export default function Lobby() {
 
     setSwitching(newFranchise);
     setSwitchError(null);
-    socket.emit('switch_franchise', { roomCode: code, userId: myUserId, newFranchise });
+    socket.emit('switch_franchise', { 
+      roomCode: code, 
+      userId: myUserId, 
+      newFranchise, 
+      displayName: passedDisplayName 
+    });
+  };
+
+  const fillWithBots = () => {
+    if (socket && code) {
+      socket.emit('host_fill_ai', { roomCode: code });
+    }
+  };
+
+  const clearBots = () => {
+    if (socket && code) {
+      socket.emit('host_clear_ai', { roomCode: code });
+    }
   };
 
   return (
@@ -348,6 +376,27 @@ export default function Lobby() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {isHost && isLobby && (
+              aiCount > 0 ? (
+                <GameButton
+                  onClick={clearBots}
+                  variant="secondary"
+                  size="sm"
+                  icon={<BotsAiIcon size={14} color="#EF4444" />}
+                >
+                  Clear Bots
+                </GameButton>
+              ) : (
+                <GameButton
+                  onClick={fillWithBots}
+                  variant="secondary"
+                  size="sm"
+                  icon={<BotsAiIcon size={14} color="#06B6D4" />}
+                >
+                  Fill with Bots
+                </GameButton>
+              )
+            )}
             <GameButton
               onClick={() => {
                 setShowInviteModal(true);
@@ -390,9 +439,9 @@ export default function Lobby() {
             <span className="text-[11px] text-[#86948A]">{isGameManager ? 'active role:' : 'playing as'}</span>
             <span
               className="text-sm font-display font-black"
-              style={{ color: isGameManager ? '#FFB95F' : ALL_FRANCHISES.find(f => f.id === myFranchise)?.primary || '#10B981' }}
+              style={{ color: isGameManager ? '#FFB95F' : (ALL_FRANCHISES.find(f => f.id === myFranchise)?.primary || '#10B981') }}
             >
-              {isGameManager ? 'GAME MANAGER (ADMIN)' : myFranchise}
+              {isGameManager ? 'GAME MANAGER (ADMIN)' : (myFranchise || 'Selecting Team...')}
             </span>
           </div>
 
@@ -404,14 +453,16 @@ export default function Lobby() {
                 <button
                   type="button"
                   onClick={() => handleSwitchFranchise('ADMIN')}
-                  className="px-2.5 py-1 rounded-[4px] bg-[#F59E0B]/15 border border-[#F59E0B]/40 hover:bg-[#F59E0B]/25 text-[#FFB95F] text-[10px] font-mono font-bold transition flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-[4px] bg-[#F59E0B]/15 border border-[#F59E0B]/40 hover:bg-[#F59E0B]/25 text-[#FFB95F] text-[10px] font-mono font-bold transition flex items-center gap-1 cursor-pointer"
                 >
                   <CrownHostIcon size={12} color="#F59E0B" /> SWITCH TO ADMIN ROLE
                 </button>
               )
             )}
             {isLobby && !isHost && (
-              <span className="text-[11px] text-[#86948A] italic">Click any open slot to switch</span>
+              <span className="text-[11px] text-[#86948A] italic">
+                {myFranchise ? 'Click any open slot or bot to switch team' : 'Click any open team below to join'}
+              </span>
             )}
           </div>
         </div>
@@ -427,7 +478,7 @@ export default function Lobby() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {ALL_FRANCHISES.map((team) => {
               const participant = room?.participants?.find((p: any) => p.franchise_id === team.id);
-              const isMyTeam = myFranchise === team.id;
+              const isMyTeam = (myFranchise === team.id && !participant?.is_ai) || (participant && participant.user_id === myUserId && !participant.is_ai);
               const isAITeam = participant?.is_ai;
               const isTakenByOther = participant && !isAITeam && participant.user_id !== myUserId;
               const isOpen = !participant;
@@ -444,21 +495,23 @@ export default function Lobby() {
                       : isTakenByOther
                       ? 'border-[#1F2937] bg-[#111827]'
                       : canSwitch
-                      ? 'border-[#1F2937]/50 bg-[#0F131C] hover:border-[#10B981]/50 hover:bg-[#1C1F29]/50 cursor-pointer'
+                      ? 'border-[#10B981]/30 bg-[#0F131C] hover:border-[#10B981] hover:bg-[#1C1F29]/50 cursor-pointer'
                       : 'border-[#1F2937]/50 bg-[#0F131C] opacity-40'
                   } ${isSwitching ? 'animate-pulse border-[#F59E0B]' : ''}`}
                   style={{ borderTop: `3px solid ${team.primary}` }}
                   title={
                     isMyTeam ? 'Your current team' :
                     isTakenByOther ? `Taken by ${participant.display_name}` :
-                    canSwitch ? `Click to switch to ${team.id}` : team.id
+                    isOpen ? `Click to select ${team.id}` :
+                    isAITeam ? `Click to take over ${team.id} from bot` :
+                    `Click to switch to ${team.id}`
                   }
                 >
                   {/* Switch hint overlay on hover */}
                   {canSwitch && !isSwitching && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-[#10B981]/10 rounded-[6px]">
-                      <span className="text-[10px] font-display font-bold text-[#10B981] bg-[#090D16]/80 px-2 py-1 rounded-[4px]">
-                        SWITCH
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-[#10B981]/15 rounded-[6px] backdrop-blur-[1px]">
+                      <span className="text-[10px] font-display font-bold text-[#10B981] bg-[#090D16]/90 px-2.5 py-1 rounded-[4px] border border-[#10B981]/40 shadow">
+                        {isOpen ? 'SELECT' : isAITeam ? 'TAKE OVER' : 'SWITCH'}
                       </span>
                     </div>
                   )}
@@ -475,10 +528,10 @@ export default function Lobby() {
                       </span>
                     ) : isAITeam ? (
                       <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30 uppercase tracking-wider">
-                        AI
+                        BOT
                       </span>
                     ) : (
-                      <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#86948A]/15 text-[#86948A] border border-[#1F2937] uppercase tracking-wider">
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 uppercase tracking-wider">
                         OPEN
                       </span>
                     )}
@@ -495,10 +548,10 @@ export default function Lobby() {
                       <img
                         src={team.logoUrl}
                         alt={team.id}
-                        className={`h-14 w-auto max-w-[80%] object-contain drop-shadow ${isOpen && !isSwitching ? 'opacity-30' : ''}`}
+                        className={`h-14 w-auto max-w-[80%] object-contain drop-shadow ${isOpen && !isSwitching ? 'opacity-40' : ''}`}
                       />
                     ) : (
-                      <div className={`text-2xl ${isOpen && !isSwitching ? 'opacity-30' : ''}`}>{team.emoji}</div>
+                      <div className={`text-2xl ${isOpen && !isSwitching ? 'opacity-40' : ''}`}>{team.emoji}</div>
                     )}
                   </div>
 
@@ -508,17 +561,22 @@ export default function Lobby() {
                       {team.id}
                     </div>
                     <div className="text-[11px] truncate font-bold mt-0.5" style={{ 
-                      color: isMyTeam ? '#10B981' : isTakenByOther ? '#DFE2EF' : '#3C4A42' 
+                      color: isMyTeam ? '#10B981' : isTakenByOther ? '#DFE2EF' : isAITeam ? '#06B6D4' : '#10B981' 
                     }}>
                       {isSwitching ? '⟳ Switching...' :
                        isAITeam ? `🤖 ${participant.display_name}` :
                        isTakenByOther ? participant.display_name :
                        isMyTeam ? passedDisplayName :
-                       'Open Slot'}
+                       'Select Team'}
                     </div>
                     {participant && !isOpen && (
                       <div className="text-[10px] text-[#10B981] font-mono mt-0.5 font-bold">
                         {formatCr(participant.purse_remaining_lakhs)}
+                      </div>
+                    )}
+                    {isOpen && (
+                      <div className="text-[9px] text-[#86948A] font-mono mt-0.5">
+                        Tap to Select
                       </div>
                     )}
                   </div>
@@ -574,16 +632,41 @@ export default function Lobby() {
           <p className="text-xs text-[#86948A]">
             {participantCount < 2 ? '⚠ Need at least 2 teams to start' : `${participantCount} teams ready — good to go!`}
           </p>
-          <GameButton
-            onClick={startAuction}
-            variant="primary"
-            size="lg"
-            disabled={participantCount < 2}
-            className="sm:w-auto px-8"
-            icon={<PlayArrowIcon size={18} color="#090D16" />}
-          >
-            START AUCTION
-          </GameButton>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {isLobby && (
+              aiCount > 0 ? (
+                <GameButton
+                  onClick={clearBots}
+                  variant="secondary"
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  icon={<BotsAiIcon size={16} color="#EF4444" />}
+                >
+                  CLEAR BOTS
+                </GameButton>
+              ) : (
+                <GameButton
+                  onClick={fillWithBots}
+                  variant="secondary"
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  icon={<BotsAiIcon size={16} color="#06B6D4" />}
+                >
+                  FILL WITH BOTS
+                </GameButton>
+              )
+            )}
+            <GameButton
+              onClick={startAuction}
+              variant="primary"
+              size="lg"
+              disabled={participantCount < 2}
+              className="w-full sm:w-auto px-8"
+              icon={<PlayArrowIcon size={18} color="#090D16" />}
+            >
+              START AUCTION
+            </GameButton>
+          </div>
         </div>
       )}
 

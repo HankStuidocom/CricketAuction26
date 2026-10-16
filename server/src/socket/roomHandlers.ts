@@ -232,6 +232,8 @@ export function setupSocketHandlers(io: Server) {
             } catch {
               validHostToken = false;
             }
+          } else if (room.host_id === effectiveUserId) {
+            validHostToken = true;
           }
           if (!validHostToken) {
             isHostUser = false;
@@ -359,55 +361,64 @@ export function setupSocketHandlers(io: Server) {
         return;
       }
 
-      // 8. In LOBBY: Check if requested franchise is already taken by another human
-      if (franchise) {
-        const targetSlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as unknown as RoomParticipant | undefined;
-        if (targetSlot && targetSlot.user_id !== effectiveUserId && !targetSlot.is_ai) {
-          return socket.emit('join_error', { 
-            code: 'FRANCHISE_TAKEN', 
-            message: `${franchise} is already taken by another player` 
-          });
-        }
-      }
+      // 8. Auto-assign open franchise if requested franchise is taken by another human or not specified
+      const allParticipants = db.prepare('SELECT * FROM room_participants WHERE room_id = ?').all(room.id) as any[];
+      const takenByHuman = new Set(allParticipants.filter((p: any) => !p.is_ai && p.user_id !== effectiveUserId).map((p: any) => p.franchise_id));
 
-      // 9. Check if room is full
-      const humanCount = db.prepare('SELECT COUNT(*) as count FROM room_participants WHERE room_id = ? AND is_ai = 0').get(room.id) as { count: number };
-      if (humanCount.count >= room.max_teams) {
+      const humanCount = takenByHuman.size;
+      if (humanCount >= room.max_teams) {
         return socket.emit('join_error', { 
           code: 'ROOM_FULL', 
           message: 'Room is full (max teams reached)' 
         });
       }
 
-      // 10. Join new franchise slot (or take over AI slot)
+      const allFranchises = ['CSK', 'MI', 'KKR', 'RCB', 'DC', 'PBKS', 'RR', 'SRH', 'GT', 'LSG'];
+      let assignedFranchise = franchise;
+
+      // If requested franchise is taken by another human player or not provided:
+      if (!assignedFranchise || takenByHuman.has(assignedFranchise) || assignedFranchise === 'ADMIN') {
+        assignedFranchise = allFranchises.find(f => !takenByHuman.has(f));
+      }
+
+      if (!assignedFranchise) {
+        return socket.emit('join_error', { 
+          code: 'ROOM_FULL', 
+          message: 'Room is full (no open franchise slots available)' 
+        });
+      }
+
       socket.join(normalizedCode);
       let participant: RoomParticipant | undefined;
-      const targetSlot = franchise 
-        ? db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as any
-        : null;
+      const targetSlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, assignedFranchise) as any;
+      const playerDisplayName = displayName || (socket.data.authUsername ? socket.data.authUsername : 'Player');
 
       if (targetSlot && targetSlot.is_ai) {
+        // Player replaces AI bot
         db.prepare('UPDATE room_participants SET user_id = ?, is_ai = 0, ai_difficulty = NULL, display_name = ? WHERE id = ?')
-          .run(effectiveUserId, displayName, targetSlot.id);
+          .run(effectiveUserId, playerDisplayName, targetSlot.id);
         participant = db.prepare('SELECT * FROM room_participants WHERE id = ?').get(targetSlot.id) as unknown as RoomParticipant;
-      } else if (franchise) {
+      } else if (!targetSlot) {
         const isHost = isHostUser ? 1 : 0;
         db.prepare(`
           INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, joined_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(crypto.randomUUID(), room.id, effectiveUserId, franchise, displayName, room.starting_purse_lakhs, isHost, Date.now());
-        participant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, franchise) as unknown as RoomParticipant;
+        `).run(crypto.randomUUID(), room.id, effectiveUserId, assignedFranchise, playerDisplayName, room.starting_purse_lakhs, isHost, Date.now());
+        participant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, assignedFranchise) as unknown as RoomParticipant;
+      } else {
+        participant = targetSlot;
       }
 
       socket.emit('join_handshake_success', {
         role: 'FRANCHISE_OWNER',
         roomCode: normalizedCode,
-        franchise: participant?.franchise_id || franchise,
+        franchise: assignedFranchise,
         participant,
         room
       });
       socket.emit('room_joined', { room, participant });
       emitRoomState(io, normalizedCode);
+      io.to(normalizedCode).emit('participant_joined', { participant });
     });
 
     socket.on('spectate_room', (data) => {
@@ -760,9 +771,9 @@ export function setupSocketHandlers(io: Server) {
       }
     });
 
-    // Allow players to switch franchise slot during LOBBY phase
+    // Allow players to switch or claim franchise slot during LOBBY phase
     socket.on('switch_franchise', (data) => {
-      const { roomCode, userId, newFranchise } = data;
+      const { roomCode, userId, newFranchise, displayName } = data;
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return socket.emit('error', { message: 'Room not found' });
@@ -772,51 +783,53 @@ export function setupSocketHandlers(io: Server) {
         return socket.emit('error', { message: 'Cannot switch teams after auction starts' });
       }
 
-      // Handle switching to/from ADMIN (Game Manager)
-      const isHost = room.host_id === userId;
+      const effectiveUserId = socket.data.userId || userId;
+      const isHost = room.host_id === effectiveUserId;
 
       if (newFranchise === 'ADMIN') {
         if (!isHost) return socket.emit('error', { message: 'Only the host can become Game Manager' });
         // Remove host from participants table if they held a team slot
-        const currentSlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, userId) as any;
+        const currentSlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, effectiveUserId) as any;
         if (currentSlot) {
           db.prepare('DELETE FROM room_participants WHERE id = ?').run(currentSlot.id);
         }
         db.prepare('UPDATE rooms SET host_franchise = "ADMIN" WHERE id = ?').run(room.id);
-        logEvent(room.id, 'franchise_switched', { userId, from: currentSlot?.franchise_id || 'UNKNOWN', to: 'ADMIN' });
+        logEvent(room.id, 'franchise_switched', { userId: effectiveUserId, from: currentSlot?.franchise_id || 'UNKNOWN', to: 'ADMIN' });
         emitRoomState(io, normalizedCode);
+        io.to(normalizedCode).emit('participant_joined', {});
         return socket.emit('franchise_switched', { newFranchise: 'ADMIN', participant: null });
       }
 
       // Check if target franchise is already taken by another human
       const targetSlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND franchise_id = ?').get(room.id, newFranchise) as unknown as RoomParticipant | undefined;
-      if (targetSlot && targetSlot.user_id !== userId && !targetSlot.is_ai) {
+      if (targetSlot && targetSlot.user_id !== effectiveUserId && !targetSlot.is_ai) {
         return socket.emit('error', { message: `${newFranchise} is already taken by another player` });
       }
 
       // Find the user's current slot
-      const mySlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, userId) as unknown as RoomParticipant | undefined;
+      const mySlot = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, effectiveUserId) as unknown as RoomParticipant | undefined;
       
-      // If user is currently Game Manager (host with no participant slot) and wants to pick a team:
-      if (!mySlot && isHost) {
-        // If target slot is an AI slot, remove that AI slot first
+      // If user doesn't have a slot yet (claim team slot directly):
+      if (!mySlot) {
+        // If target slot is an AI slot, replace that AI slot
         if (targetSlot && targetSlot.is_ai) {
           db.prepare('DELETE FROM room_participants WHERE id = ?').run(targetSlot.id);
         }
-        const hostUser = db.prepare('SELECT display_name FROM users WHERE id = ?').get(userId) as any;
-        const hostDisplayName = hostUser?.display_name || 'Host Commander';
+        const user = db.prepare('SELECT display_name FROM users WHERE id = ?').get(effectiveUserId) as any;
+        const playerDisplayName = user?.display_name || displayName || 'Player';
         db.prepare(`
           INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, joined_at)
-          VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-        `).run(crypto.randomUUID(), room.id, userId, newFranchise, hostDisplayName, room.starting_purse_lakhs, Date.now());
-        db.prepare('UPDATE rooms SET host_franchise = ? WHERE id = ?').run(newFranchise, room.id);
-        logEvent(room.id, 'franchise_switched', { userId, from: 'ADMIN', to: newFranchise });
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(crypto.randomUUID(), room.id, effectiveUserId, newFranchise, playerDisplayName, room.starting_purse_lakhs, isHost ? 1 : 0, Date.now());
+        if (isHost) {
+          db.prepare('UPDATE rooms SET host_franchise = ? WHERE id = ?').run(newFranchise, room.id);
+        }
+        logEvent(room.id, 'franchise_claimed', { userId: effectiveUserId, franchise: newFranchise });
         emitRoomState(io, normalizedCode);
-        const newPart = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, userId);
+        io.to(normalizedCode).emit('participant_joined', {});
+        const newPart = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, effectiveUserId);
         return socket.emit('franchise_switched', { newFranchise, participant: newPart });
       }
-
-      if (!mySlot) return socket.emit('error', { message: 'You are not in this room' });
 
       // If target slot is an AI slot, remove that AI slot first
       if (targetSlot && targetSlot.is_ai) {
@@ -829,12 +842,68 @@ export function setupSocketHandlers(io: Server) {
         db.prepare('UPDATE rooms SET host_franchise = ? WHERE id = ?').run(newFranchise, room.id);
       }
 
-      logEvent(room.id, 'franchise_switched', { userId, from: mySlot.franchise_id, to: newFranchise });
+      logEvent(room.id, 'franchise_switched', { userId: effectiveUserId, from: mySlot.franchise_id, to: newFranchise });
       emitRoomState(io, normalizedCode);
+      io.to(normalizedCode).emit('participant_joined', {});
       
       // Send the updated participant back to the switcher
       const updatedParticipant = db.prepare('SELECT * FROM room_participants WHERE id = ?').get(mySlot.id);
       socket.emit('franchise_switched', { newFranchise, participant: updatedParticipant });
+    });
+
+    // Host action: Fill remaining empty slots with AI bots
+    socket.on('host_fill_ai', (data) => {
+      const { roomCode } = data;
+      const normalizedCode = (roomCode || '').trim().toUpperCase();
+      const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as any;
+      if (!room) return socket.emit('error', { message: 'Room not found' });
+      if (!checkHostAuthority(room, socket)) {
+        return socket.emit('error', { message: 'Only host or commissioner can fill AI bots' });
+      }
+      if (room.status !== 'LOBBY') {
+        return socket.emit('error', { message: 'Can only fill AI bots in the lobby' });
+      }
+
+      const allFranchises = ['CSK', 'MI', 'KKR', 'RCB', 'DC', 'PBKS', 'RR', 'SRH', 'GT', 'LSG'];
+      const participants = db.prepare('SELECT * FROM room_participants WHERE room_id = ?').all(room.id) as any[];
+      const takenFranchises = new Set(participants.map((p: any) => p.franchise_id));
+
+      let filled = 0;
+      for (const fId of allFranchises) {
+        if (participants.length + filled >= (room.max_teams || 10)) break;
+        if (!takenFranchises.has(fId)) {
+          db.prepare(`
+            INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, is_ai, ai_difficulty, joined_at)
+            VALUES (?, ?, NULL, ?, ?, ?, 0, 1, 'MEDIUM', ?)
+          `).run(crypto.randomUUID(), room.id, fId, `${fId} Bot`, room.starting_purse_lakhs, Date.now());
+          filled++;
+        }
+      }
+
+      db.prepare('UPDATE rooms SET ai_enabled = 1 WHERE id = ?').run(room.id);
+      logEvent(room.id, 'filled_ai', { filledCount: filled });
+      emitRoomState(io, normalizedCode);
+      io.to(normalizedCode).emit('participant_joined', {});
+    });
+
+    // Host action: Clear all AI bots to reopen slots for human players
+    socket.on('host_clear_ai', (data) => {
+      const { roomCode } = data;
+      const normalizedCode = (roomCode || '').trim().toUpperCase();
+      const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as any;
+      if (!room) return socket.emit('error', { message: 'Room not found' });
+      if (!checkHostAuthority(room, socket)) {
+        return socket.emit('error', { message: 'Only host or commissioner can clear AI bots' });
+      }
+      if (room.status !== 'LOBBY') {
+        return socket.emit('error', { message: 'Can only clear AI bots in the lobby' });
+      }
+
+      db.prepare('DELETE FROM room_participants WHERE room_id = ? AND is_ai = 1').run(room.id);
+      db.prepare('UPDATE rooms SET ai_enabled = 0 WHERE id = ?').run(room.id);
+      logEvent(room.id, 'cleared_ai', {});
+      emitRoomState(io, normalizedCode);
+      io.to(normalizedCode).emit('participant_joined', {});
     });
 
     socket.on('disconnect', () => {
