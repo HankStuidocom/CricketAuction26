@@ -90,12 +90,13 @@ router.get('/search', requireAuth, (req: any, res) => {
     }
 
     const searchPattern = `%${query}%`;
+    const idPrefixPattern = `${query}%`;
     const users = db.prepare(`
       SELECT id, username, display_name, avatar_emoji, rank_name, level, likes_count, auctions_played, auctions_won
       FROM users
-      WHERE id != ? AND (username LIKE ? OR display_name LIKE ? OR id = ?)
+      WHERE id != ? AND (username LIKE ? OR display_name LIKE ? OR id LIKE ?)
       LIMIT 20
-    `).all(userId, searchPattern, searchPattern, query) as any[];
+    `).all(userId, searchPattern, searchPattern, idPrefixPattern) as any[];
 
     // Fetch existing relationships
     const friends = db.prepare(`
@@ -273,7 +274,33 @@ router.post('/invite', requireAuth, (req: any, res) => {
     const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normCode) as any;
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
-    // Verify room has capacity
+    // 1. Verify sender is a participant or host of this room
+    const isSenderInRoom = Boolean(db.prepare('SELECT id FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, senderId)) || room.host_id === senderId;
+    if (!isSenderInRoom) {
+      return res.status(403).json({ error: 'You must be a participant or host of this room to send invitations' });
+    }
+
+    // 2. Verify mutual friendship
+    const areFriends = Boolean(db.prepare(`
+      SELECT id FROM friendships 
+      WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
+    `).get(senderId, friendId, friendId, senderId));
+    if (!areFriends) {
+      return res.status(400).json({ error: 'You can only invite accepted friends' });
+    }
+
+    // 3. Verify room is active (not completed or cancelled)
+    if (room.status === 'COMPLETED' || room.status === 'CANCELLED') {
+      return res.status(400).json({ error: 'Cannot invite to an inactive or concluded room' });
+    }
+
+    // 4. Verify friend is not already in the room
+    const friendInRoom = Boolean(db.prepare('SELECT id FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, friendId));
+    if (friendInRoom) {
+      return res.status(400).json({ error: 'Player is already in this room' });
+    }
+
+    // 5. Verify room has capacity
     const participants = db.prepare('SELECT COUNT(*) as count FROM room_participants WHERE room_id = ?').get(room.id) as { count: number };
     if (participants && participants.count >= room.max_teams) {
       return res.status(400).json({ error: 'Room is already full' });

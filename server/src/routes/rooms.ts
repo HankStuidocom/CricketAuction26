@@ -69,21 +69,24 @@ function enrichRoom(room: any) {
 // List public rooms (with optional live filter and full leaderboard/purse enrichment)
 router.get('/', (req, res) => {
   try {
-    const liveOnly = req.query.live === 'true' || req.query.status === 'IN_PROGRESS' || req.query.status === 'LIVE';
+    const liveOnly = req.query.live === 'true' || req.query.status === 'LIVE' || req.query.status === 'IN_PROGRESS';
+    const statusParam = req.query.status as string | undefined;
+
     let query = `
       SELECT * FROM rooms 
       WHERE is_private = 0 
-        AND status IN ('LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED')
         AND room_code NOT LIKE 'TEST%'
         AND room_code NOT LIKE 'ID%'
         AND room_code NOT LIKE 'PR%'
-        AND room_name NOT LIKE '%Test%'
-        AND room_name NOT LIKE '%Arena%'
-        AND room_name NOT LIKE 'Room CV2SNY'
-        AND room_name NOT LIKE 'Multiplayer Reliability%'
+        AND room_code NOT LIKE 'SMK%'
     `;
     if (liveOnly) {
-      query += ' AND status IN ("IN_PROGRESS", "LIVE", "FINAL_ROUND", "PAUSED")';
+      query += ` AND status IN ('IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED')`;
+    } else if (statusParam && statusParam !== 'ALL') {
+      const sanitized = statusParam.replace(/[^A-Z_]/g, '');
+      query += ` AND status = '${sanitized}'`;
+    } else {
+      query += ` AND status IN ('LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED', 'COMPLETED', 'CANCELLED')`;
     }
     query += ' ORDER BY created_at DESC LIMIT 50';
     const rooms = db.prepare(query).all() as any[];
@@ -111,12 +114,10 @@ router.get('/my/private', (req, res) => {
       LEFT JOIN room_invites ri ON ri.room_id = r.id AND ri.receiver_id = ?
       WHERE r.is_private = 1 
         AND (r.host_id = ? OR rp.user_id IS NOT NULL OR ri.receiver_id IS NOT NULL)
-        AND r.status IN ('LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED')
         AND r.room_code NOT LIKE 'TEST%'
         AND r.room_code NOT LIKE 'ID%'
         AND r.room_code NOT LIKE 'PR%'
-        AND r.room_name NOT LIKE '%Test%'
-        AND r.room_name NOT LIKE '%Arena%'
+        AND r.room_code NOT LIKE 'SMK%'
       ORDER BY r.created_at DESC LIMIT 50
     `).all(userId, userId, userId) as any[];
 
@@ -219,6 +220,12 @@ router.post('/', (req, res) => {
       JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    // Broadcast to all connected clients on Home and Matches to update room lists immediately
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('rooms_updated', { roomCode, isPrivate: Boolean(roomConfig?.isPrivate) });
+    }
 
     res.json({ success: true, roomCode, roomId, hostToken });
   } catch (err: any) {
@@ -330,6 +337,7 @@ router.post('/:code/start', (req, res) => {
     if (io) {
       emitRoomState(io, code);
       io.to(code).emit('auction_started', { room: buildFullRoomState(code) });
+      io.emit('rooms_updated', { roomCode: code, status: 'LIVE' });
     }
 
     const updatedRoom = db.prepare('SELECT * FROM rooms WHERE id = ?').get(room.id);

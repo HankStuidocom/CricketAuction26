@@ -31,7 +31,7 @@ export function isValidLadderBid(currentBid: number, targetBid: number, basePric
   return curr === targetBid;
 }
 
-export function processBid(roomCode: string, franchiseId: string, amount: number, idempotencyKey: string) {
+export function processBid(roomCode: string, franchiseId: string, amount: number, idempotencyKey: string, callerUserId?: string) {
   const tx = db.transaction(() => {
     const roomRow = db.prepare('SELECT * FROM rooms WHERE room_code = ?').get(roomCode) as unknown as Room | undefined;
     if (!roomRow) throw new Error('Room not found');
@@ -81,11 +81,12 @@ export function processBid(roomCode: string, franchiseId: string, amount: number
     const existingBid = db.prepare('SELECT id FROM bids WHERE idempotency_key = ?').get(idempotencyKey);
     if (existingBid && (existingBid as any).id) return roomRow; // Already processed
 
+    const effectiveUserId = callerUserId || participantRow.user_id || null;
     db.prepare(`
-      INSERT INTO bids (id, room_id, player_id, bidder_franchise, amount_lakhs, placed_at, idempotency_key)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO bids (id, room_id, player_id, bidder_franchise, bidder_user_id, amount_lakhs, placed_at, idempotency_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      crypto.randomUUID(), roomRow.id, roomRow.current_player_id, franchiseId,
+      crypto.randomUUID(), roomRow.id, roomRow.current_player_id, franchiseId, effectiveUserId,
       amount, Date.now(), idempotencyKey
     );
 
@@ -179,6 +180,9 @@ export function relistCurrent(roomId: string) {
   const tx = db.transaction(() => {
     const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as unknown as Room | undefined;
     if (!room || !room.current_player_id) return null;
+    if (room.current_bid_lakhs > 0 || room.current_bidder_franchise) {
+      throw new Error('A player with an active bid cannot be relisted');
+    }
 
     db.prepare(`UPDATE auction_queue SET status = 'RELISTED' WHERE room_id = ? AND player_id = ?`)
       .run(room.id, room.current_player_id);
@@ -204,6 +208,19 @@ export function relistUnsoldPlayer(roomId: string, playerId: string) {
 
     db.prepare(`UPDATE auction_queue SET status = 'RELISTED' WHERE room_id = ? AND player_id = ?`)
       .run(roomId, playerId);
+
+    // If the room was already marked COMPLETED because queue ran out, resume it to FINAL_ROUND!
+    const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as any;
+    if (room && room.status === 'COMPLETED') {
+      const isUnlimited = Boolean(room.is_unlimited_timer);
+      const timer = Math.min(room.bid_timer_seconds || 10, 8);
+      const newDeadline = isUnlimited ? null : Date.now() + (timer * 1000);
+      db.prepare(`UPDATE rooms SET status = 'FINAL_ROUND', completed_at = NULL, current_player_id = ?, bid_deadline = ?, current_bid_lakhs = 0, current_bidder_franchise = NULL WHERE id = ?`)
+        .run(playerId, newDeadline, roomId);
+      db.prepare(`UPDATE auction_queue SET status = 'ACTIVE' WHERE room_id = ? AND player_id = ?`)
+        .run(roomId, playerId);
+    }
+
     return true;
   });
   return tx();
@@ -217,6 +234,9 @@ export function deferCurrentPlayer(roomId: string, bumpPositions = 5) {
   const tx = db.transaction(() => {
     const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as unknown as Room | undefined;
     if (!room || !room.current_player_id) return null;
+    if (room.current_bid_lakhs > 0 || room.current_bidder_franchise) {
+      throw new Error('Cannot defer card while bids are active');
+    }
 
     const playerId = room.current_player_id;
     // Get all pending items in current order (excluding deferred player)

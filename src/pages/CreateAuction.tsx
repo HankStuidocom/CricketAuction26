@@ -50,6 +50,7 @@ export default function CreateAuction() {
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiDifficulty, setAiDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
 
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -58,7 +59,6 @@ export default function CreateAuction() {
     setError('');
 
     const hostId = getOrCreateUserId();
-    const idempotencyKey = crypto.randomUUID();
 
     const payload = {
       idempotencyKey,

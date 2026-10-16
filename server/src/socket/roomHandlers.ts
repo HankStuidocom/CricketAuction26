@@ -193,7 +193,17 @@ export function setupSocketHandlers(io: Server) {
       const isRegisteredHost = Boolean(db.prepare('SELECT id FROM users WHERE id = ?').get(room.host_id));
       let effectiveUserId = socket.data.authUserId || userId;
 
-      // Impersonation protection: prevent unauthenticated clients from spoofing a registered host
+      // Impersonation protection: prevent unauthenticated clients from spoofing any registered user account
+      if (userId) {
+        const isRegisteredUser = Boolean(db.prepare('SELECT id FROM users WHERE id = ?').get(userId));
+        if (isRegisteredUser && socket.data.authUserId !== userId) {
+          return socket.emit('join_error', { 
+            code: 'AUTH_REQUIRED', 
+            message: 'Authentication required to access this user account' 
+          });
+        }
+      }
+
       if (isRegisteredHost && (userId === room.host_id || effectiveUserId === room.host_id)) {
         if (socket.data.authUserId !== room.host_id) {
           return socket.emit('join_error', { 
@@ -419,6 +429,7 @@ export function setupSocketHandlers(io: Server) {
       socket.emit('room_joined', { room, participant });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('participant_joined', { participant });
+      io.emit('rooms_updated', { roomCode: normalizedCode });
     });
 
     socket.on('spectate_room', (data) => {
@@ -461,6 +472,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'started', { started_by: room.host_franchise });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('auction_started', { room: buildFullRoomState(normalizedCode) });
+      io.emit('rooms_updated', { roomCode: normalizedCode, status: 'LIVE' });
 
       // Start AI bidding check
       scheduleAIBidding(io, normalizedCode);
@@ -473,7 +485,7 @@ export function setupSocketHandlers(io: Server) {
         const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as any;
         if (!room) throw new Error('Room not found');
 
-        const callerUserId = socket.data.userId;
+        const callerUserId = socket.data.authUserId || socket.data.userId;
 
         // Fairness rule: Commissioner / Game Manager cannot participate in franchise bidding
         if (room.host_id === callerUserId && room.host_franchise === 'ADMIN') {
@@ -488,7 +500,7 @@ export function setupSocketHandlers(io: Server) {
         if (participant.is_ai) {
           throw new Error('Cannot bid on behalf of an AI franchise');
         }
-        if (callerUserId && participant.user_id !== callerUserId) {
+        if (callerUserId && participant.user_id && participant.user_id !== callerUserId) {
           throw new Error(`Unauthorized: You do not own franchise ${franchise}`);
         }
         
@@ -502,7 +514,7 @@ export function setupSocketHandlers(io: Server) {
           }
         }
 
-        const updatedRoom = processBid(normalizedCode, franchise, bidAmount, idempotencyKey);
+        const updatedRoom = processBid(normalizedCode, franchise, bidAmount, idempotencyKey, callerUserId);
         
         logEvent(updatedRoom.id, 'bid', { franchise, amount: bidAmount });
         emitRoomState(io, normalizedCode);
@@ -533,6 +545,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'paused', { by: room.host_franchise });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('auction_paused', {});
+      io.emit('rooms_updated', { roomCode: normalizedCode, status: 'PAUSED' });
     });
 
     socket.on('host_resume', (data) => {
@@ -550,6 +563,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'resumed', { by: room.host_franchise, status: resumeStatus });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('auction_resumed', { deadline: newDeadline, status: resumeStatus });
+      io.emit('rooms_updated', { roomCode: normalizedCode, status: resumeStatus });
 
       scheduleAIBidding(io, normalizedCode);
     });
@@ -732,6 +746,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'auction_ended_by_host', { by: socket.data.userId, resolution: activeCardResolution });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('auction_completed', { message: 'Auction concluded by Commissioner' });
+      io.emit('rooms_updated', { roomCode: normalizedCode, status: 'COMPLETED' });
     });
 
     socket.on('host_cancel_room', (data) => {
@@ -745,6 +760,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'room_cancelled', { by: socket.data.userId });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('room_cancelled', { message: 'Room has been cancelled by host' });
+      io.emit('rooms_updated', { roomCode: normalizedCode, status: 'CANCELLED' });
     });
 
     socket.on('send_chat', (data) => {
@@ -768,6 +784,7 @@ export function setupSocketHandlers(io: Server) {
           db.prepare('DELETE FROM room_participants WHERE id = ?').run(participant.id);
         }
         emitRoomState(io, normalizedCode);
+        io.emit('rooms_updated', { roomCode: normalizedCode });
       }
     });
 
@@ -797,6 +814,7 @@ export function setupSocketHandlers(io: Server) {
         logEvent(room.id, 'franchise_switched', { userId: effectiveUserId, from: currentSlot?.franchise_id || 'UNKNOWN', to: 'ADMIN' });
         emitRoomState(io, normalizedCode);
         io.to(normalizedCode).emit('participant_joined', {});
+        io.emit('rooms_updated', { roomCode: normalizedCode });
         return socket.emit('franchise_switched', { newFranchise: 'ADMIN', participant: null });
       }
 
@@ -827,6 +845,7 @@ export function setupSocketHandlers(io: Server) {
         logEvent(room.id, 'franchise_claimed', { userId: effectiveUserId, franchise: newFranchise });
         emitRoomState(io, normalizedCode);
         io.to(normalizedCode).emit('participant_joined', {});
+        io.emit('rooms_updated', { roomCode: normalizedCode });
         const newPart = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, effectiveUserId);
         return socket.emit('franchise_switched', { newFranchise, participant: newPart });
       }
@@ -845,6 +864,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'franchise_switched', { userId: effectiveUserId, from: mySlot.franchise_id, to: newFranchise });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('participant_joined', {});
+      io.emit('rooms_updated', { roomCode: normalizedCode });
       
       // Send the updated participant back to the switcher
       const updatedParticipant = db.prepare('SELECT * FROM room_participants WHERE id = ?').get(mySlot.id);
@@ -884,6 +904,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'filled_ai', { filledCount: filled });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('participant_joined', {});
+      io.emit('rooms_updated', { roomCode: normalizedCode });
     });
 
     // Host action: Clear all AI bots to reopen slots for human players
@@ -904,6 +925,7 @@ export function setupSocketHandlers(io: Server) {
       logEvent(room.id, 'cleared_ai', {});
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('participant_joined', {});
+      io.emit('rooms_updated', { roomCode: normalizedCode });
     });
 
     socket.on('disconnect', () => {
@@ -924,6 +946,7 @@ export function setupSocketHandlers(io: Server) {
       if (updatedRoom && updatedRoom.status === 'COMPLETED') {
         logEvent(room.id, 'completed', {});
         io.to(room.room_code).emit('auction_completed', { message: 'Auction finished' });
+        io.emit('rooms_updated', { roomCode: room.room_code, status: 'COMPLETED' });
       } else {
         // Trigger AI bids for the newly active player
         scheduleAIBidding(io, room.room_code);

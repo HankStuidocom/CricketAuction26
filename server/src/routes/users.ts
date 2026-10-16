@@ -48,6 +48,7 @@ router.get('/:id/profile', (req, res) => {
 
     const played = user.auctions_played || 0;
     const won = user.auctions_won || 0;
+    const losses = Math.max(0, played - won);
     const winRate = played > 0 ? Math.round((won / played) * 100) : 0;
 
     res.json({
@@ -60,6 +61,8 @@ router.get('/:id/profile', (req, res) => {
       xp: user.xp || 0,
       auctions_played: played,
       auctions_won: won,
+      losses: losses,
+      auctions_lost: losses,
       win_rate: winRate,
       blitz_count: user.blitz_count || 0,
       mega_count: user.mega_count || 0,
@@ -82,6 +85,9 @@ router.post('/:id/like', (req, res) => {
   }
 
   const targetUserId = req.params.id;
+  if (callerId === targetUserId) {
+    return res.status(400).json({ error: 'You cannot like your own profile' });
+  }
   try {
     const target = db.prepare('SELECT id, likes_count FROM users WHERE id = ?').get(targetUserId) as any;
     if (!target) {

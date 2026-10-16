@@ -54,29 +54,26 @@ async function startServer() {
   await db.init();
   initializeDatabase();
 
-  // Purge any pre-existing dummy/stale/completed rooms so only real player-created rooms appear
+  // Clean up any lingering automated test-fixture rooms on boot
   try {
-    const dummyFilter = `
-      status IN ('COMPLETED', 'CANCELLED')
-      OR room_code LIKE 'TEST%'
+    const testFixtureFilter = `
+      room_code LIKE 'TEST%'
       OR room_code LIKE 'ID%'
       OR room_code LIKE 'PR%'
-      OR room_name LIKE '%Arena%'
-      OR room_name LIKE '%Test%'
-      OR room_name LIKE 'Room CV2SNY'
-      OR room_name LIKE 'Multiplayer Reliability%'
-      OR created_at < 1792154000000
+      OR room_code LIKE 'SMK%'
     `;
-    db.prepare(`DELETE FROM squad_players WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
-    db.prepare(`DELETE FROM bids WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
-    db.prepare(`DELETE FROM auction_queue WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
-    db.prepare(`DELETE FROM room_participants WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
-    db.prepare(`DELETE FROM room_invites WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
-    db.prepare(`DELETE FROM auction_events WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
-    const purged = db.prepare(`DELETE FROM rooms WHERE ${dummyFilter}`).run();
-    console.log(`[Database] Purged legacy dummy rooms on startup (${purged.changes || 0} removed)`);
+    db.prepare(`DELETE FROM squad_players WHERE room_id IN (SELECT id FROM rooms WHERE ${testFixtureFilter})`).run();
+    db.prepare(`DELETE FROM bids WHERE room_id IN (SELECT id FROM rooms WHERE ${testFixtureFilter})`).run();
+    db.prepare(`DELETE FROM auction_queue WHERE room_id IN (SELECT id FROM rooms WHERE ${testFixtureFilter})`).run();
+    db.prepare(`DELETE FROM room_participants WHERE room_id IN (SELECT id FROM rooms WHERE ${testFixtureFilter})`).run();
+    db.prepare(`DELETE FROM room_invites WHERE room_id IN (SELECT id FROM rooms WHERE ${testFixtureFilter})`).run();
+    db.prepare(`DELETE FROM auction_events WHERE room_id IN (SELECT id FROM rooms WHERE ${testFixtureFilter})`).run();
+    const purged = db.prepare(`DELETE FROM rooms WHERE ${testFixtureFilter}`).run();
+    if (purged.changes && purged.changes > 0) {
+      console.log(`[Database] Cleaned up lingering test fixtures on startup (${purged.changes} removed)`);
+    }
   } catch (err: any) {
-    console.warn('[Database] Purge warning:', err.message);
+    console.warn('[Database] Fixture cleanup warning:', err.message);
   }
 
   // Import on first run

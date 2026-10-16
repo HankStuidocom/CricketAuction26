@@ -89,6 +89,10 @@ export default function Results() {
             teamMap[p.franchise_id].total_points += p.game_points || 0;
             teamMap[p.franchise_id].squad_count += 1;
             if (p.status === 'OS') teamMap[p.franchise_id].overseas_count += 1;
+            if (p.primary_role === 'Batter') teamMap[p.franchise_id].roles.batters += 1;
+            else if (p.primary_role === 'Bowler') teamMap[p.franchise_id].roles.bowlers += 1;
+            else if (p.primary_role === 'All-Rounder') teamMap[p.franchise_id].roles.allRounders += 1;
+            else if (p.primary_role === 'Wicket-Keeper') teamMap[p.franchise_id].roles.keepers += 1;
           });
           const synthesized = Object.values(teamMap).sort((a, b) => b.total_points - a.total_points);
           synthesized.forEach((t, i) => { 
@@ -289,6 +293,20 @@ export default function Results() {
                         <span className="text-xs text-[#86948A] font-mono mt-0.5 block">
                           {team.squad_count} Players · {team.overseas_count} Overseas · Avg {team.avg_rating} ★
                         </span>
+                        <div className="flex flex-wrap gap-1 mt-1 text-[10px] font-mono">
+                          <span className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                            🏏 {team.roles?.batters || 0} Bat
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/30">
+                            🎯 {team.roles?.bowlers || 0} Bowl
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                            ⚡ {team.roles?.allRounders || 0} All
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                            🧤 {team.roles?.keepers || 0} WK
+                          </span>
+                        </div>
                       </div>
                     </div>
 

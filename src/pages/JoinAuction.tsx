@@ -99,10 +99,18 @@ export default function JoinAuction() {
         password: showPassword ? password : undefined
       });
 
-      // Navigate to room lobby — the Lobby component will emit join_room via socket
-      navigate(`/room/${code}`, {
-        state: { displayName, franchise: selectedFranchise, userId, password: showPassword ? password : undefined }
-      });
+      // If room is already live or paused, navigate directly to auction screen
+      if (['LIVE', 'IN_PROGRESS', 'FINAL_ROUND', 'PAUSED'].includes(roomInfo?.status)) {
+        navigate(`/room/${code}/auction`, {
+          state: { displayName, franchise: selectedFranchise, userId, password: showPassword ? password : undefined }
+        });
+      } else if (roomInfo?.status === 'COMPLETED') {
+        navigate(`/room/${code}/results`);
+      } else {
+        navigate(`/room/${code}`, {
+          state: { displayName, franchise: selectedFranchise, userId, password: showPassword ? password : undefined }
+        });
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

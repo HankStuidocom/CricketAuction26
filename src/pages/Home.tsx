@@ -192,6 +192,10 @@ export default function Home() {
     socket.on('auction_completed', () => {
       fetchRooms();
     });
+    socket.on('rooms_updated', () => {
+      fetchRooms();
+      fetchPrivateRooms();
+    });
     socket.on('friend_request_received', () => {
       fetchFriends();
     });
@@ -402,14 +406,11 @@ export default function Home() {
 
   const activeRoster = ROSTER_DATA[selectedFranchise] || ROSTER_DATA['CSK'];
 
-  // Filter out any legacy dummy/test/completed rooms
-  const isLegacyDummy = (r: any) => {
+  // Filter out automated test fixture rooms
+  const isAutomatedTestRoom = (r: any) => {
     if (!r) return true;
-    if (r.status === 'COMPLETED' || r.status === 'CANCELLED') return true;
     const code = (r.room_code || '').toUpperCase();
-    if (code.startsWith('TEST') || code.startsWith('ID') || code.startsWith('PR')) return true;
-    const name = (r.room_name || '').toLowerCase();
-    if (name.includes('arena') || name.includes('test') || name.includes('reliability') || name.includes('cv2sny')) return true;
+    if (code.startsWith('TEST') || code.startsWith('ID') || code.startsWith('PR') || code.startsWith('SMK')) return true;
     return false;
   };
 
@@ -417,19 +418,19 @@ export default function Home() {
   const publicLiveRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
     const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED'].includes(r.status);
-    return isPublic && isLive && !isLegacyDummy(r);
+    return isPublic && isLive && !isAutomatedTestRoom(r);
   });
 
   // FILTER RULES: Public Waiting Rooms (Lobby stage)
   const publicWaitingRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
-    return isPublic && r.status === 'LOBBY' && !isLegacyDummy(r);
+    return isPublic && r.status === 'LOBBY' && !isAutomatedTestRoom(r);
   });
 
-  // Active Public Rooms (Lobby + Live + Paused)
+  // All Public Matches (Lobby, Live, Paused, Completed, Cancelled)
   const activePublicRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
-    return isPublic && ['LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED'].includes(r.status) && !isLegacyDummy(r);
+    return isPublic && !isAutomatedTestRoom(r);
   });
 
   // Top Featured Room (Topmost active public live room)
@@ -902,6 +903,8 @@ export default function Home() {
                     const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(r.status);
                     const isPaused = r.status === 'PAUSED';
                     const isWaiting = r.status === 'LOBBY';
+                    const isCompleted = r.status === 'COMPLETED';
+                    const isCancelled = r.status === 'CANCELLED';
                     const filledSlots = r.teams_count || 0;
                     const maxSlots = r.max_teams || 10;
                     const hasOpenSlot = filledSlots < maxSlots;
@@ -917,6 +920,8 @@ export default function Home() {
                             {isLive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#EF4444]/20 text-[#EF4444] font-mono font-bold">● LIVE</span>}
                             {isPaused && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B] font-mono font-bold">PAUSED</span>}
                             {isWaiting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#06B6D4]/20 text-[#06B6D4] font-mono font-bold">WAITING</span>}
+                            {isCompleted && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#10B981]/20 text-[#10B981] font-mono font-bold">COMPLETED</span>}
+                            {isCancelled && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 font-mono font-bold">CANCELLED</span>}
                           </div>
                           <h4 className="font-display font-bold text-sm text-[#DFE2EF] truncate">{r.room_name}</h4>
                           <span className="text-[11px] text-[#86948A] font-mono block mt-0.5">
@@ -924,7 +929,37 @@ export default function Home() {
                           </span>
                         </div>
                         <div className="flex gap-2 flex-shrink-0 items-center">
-                          {hasOpenSlot ? (
+                          {isCompleted ? (
+                            <button
+                              onClick={() => navigate(`/room/${r.room_code}/results`)}
+                              className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981]/20 border border-[#10B981]/50 text-[#10B981] hover:bg-[#10B981] hover:text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow"
+                            >
+                              Results
+                            </button>
+                          ) : isCancelled ? (
+                            <button
+                              disabled
+                              className="px-3.5 py-1.5 rounded-[4px] bg-[#111827] border border-[#1F2937] text-[#86948A] font-display font-bold text-xs uppercase tracking-wider opacity-60 cursor-not-allowed"
+                            >
+                              Closed
+                            </button>
+                          ) : isWaiting ? (
+                            hasOpenSlot ? (
+                              <button
+                                onClick={() => navigate(`/room/${r.room_code}`)}
+                                className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow"
+                              >
+                                Join Room
+                              </button>
+                            ) : (
+                              <button
+                                disabled
+                                className="px-3.5 py-1.5 rounded-[4px] bg-[#111827] border border-[#1F2937] text-[#86948A] font-display font-bold text-xs uppercase tracking-wider opacity-60 cursor-not-allowed"
+                              >
+                                Full
+                              </button>
+                            )
+                          ) : hasOpenSlot ? (
                             <button
                               onClick={() => navigate(`/room/${r.room_code}`)}
                               className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow"
@@ -1437,6 +1472,13 @@ export default function Home() {
                       <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Wins (Champion)</span>
                       <span className="text-xl font-display font-black text-[#10B981] mt-0.5 block">
                         {profileData?.auctions_won ?? user.auctions_won ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] text-center">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Losses</span>
+                      <span className="text-xl font-display font-black text-[#EF4444] mt-0.5 block">
+                        {profileData?.losses ?? profileData?.auctions_lost ?? Math.max(0, (profileData?.auctions_played || user.auctions_played || 0) - (profileData?.auctions_won || user.auctions_won || 0))}
                       </span>
                     </div>
 

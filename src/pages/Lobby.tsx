@@ -87,13 +87,35 @@ export default function Lobby() {
 
     s.on('join_handshake_success', (data) => {
       if (data.room) setRoom(data.room);
+      let franchise = myFranchise;
       if (data.role === 'COMMISSIONER') {
+        franchise = 'ADMIN';
         setMyFranchise('ADMIN');
       } else if (data.franchise) {
+        franchise = data.franchise;
         setMyFranchise(data.franchise);
       } else if (data.participant?.franchise_id) {
+        franchise = data.participant.franchise_id;
         setMyFranchise(data.participant.franchise_id);
       }
+
+      if (data.room?.status === 'COMPLETED') {
+        navigate(`/room/${code}/results`);
+        return;
+      }
+      if (['LIVE', 'IN_PROGRESS', 'FINAL_ROUND', 'PAUSED'].includes(data.room?.status)) {
+        saveRoomSession(code || '', {
+          franchise,
+          displayName: passedDisplayName,
+          userId: myUserId,
+          password: passedPassword
+        });
+        navigate(`/room/${code}/auction`, {
+          state: { displayName: passedDisplayName, franchise, userId: myUserId, manager: franchise === 'ADMIN', spectator: data.isSpectator }
+        });
+        return;
+      }
+
       fetchRoomDetails();
     });
 
@@ -134,6 +156,24 @@ export default function Lobby() {
       // Keep our franchise in sync if someone else took ours
       const mySlot = state.participants?.find((p: any) => p.user_id === myUserId);
       if (mySlot?.franchise_id) setMyFranchise(mySlot.franchise_id);
+
+      if (state.status === 'COMPLETED') {
+        navigate(`/room/${code}/results`);
+        return;
+      }
+      if (['LIVE', 'IN_PROGRESS', 'FINAL_ROUND', 'PAUSED'].includes(state.status)) {
+        const franchise = mySlot?.franchise_id || myFranchise;
+        saveRoomSession(code || '', {
+          franchise,
+          displayName: passedDisplayName,
+          userId: myUserId,
+          password: passedPassword
+        });
+        navigate(`/room/${code}/auction`, {
+          state: { displayName: passedDisplayName, franchise, userId: myUserId, manager: franchise === 'ADMIN' }
+        });
+        return;
+      }
     });
 
     s.on('participant_joined', () => {
@@ -193,6 +233,17 @@ export default function Lobby() {
       // Sync my franchise from server state
       const mySlot = data.participants?.find((p: any) => p.user_id === myUserId);
       if (mySlot?.franchise_id) setMyFranchise(mySlot.franchise_id);
+
+      if (data.status === 'COMPLETED') {
+        navigate(`/room/${code}/results`);
+        return;
+      }
+      if (['LIVE', 'IN_PROGRESS', 'FINAL_ROUND', 'PAUSED'].includes(data.status)) {
+        navigate(`/room/${code}/auction`, {
+          state: { displayName: passedDisplayName, franchise: mySlot?.franchise_id || myFranchise, userId: myUserId, manager: (mySlot?.franchise_id || myFranchise) === 'ADMIN' }
+        });
+        return;
+      }
     } catch (err: any) {
       if (retries > 0) {
         setTimeout(() => fetchRoomDetails(retries - 1), 1000);
