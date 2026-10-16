@@ -35,6 +35,9 @@ export default function Lobby() {
   const [friendsLoading, setFriendsLoading] = useState(false);
   const [invitedMap, setInvitedMap] = useState<Record<string, boolean>>({});
   const [inviteStatusMsg, setInviteStatusMsg] = useState<string | null>(null);
+  const [showCloseRoomModal, setShowCloseRoomModal] = useState(false);
+  const [closeRoomError, setCloseRoomError] = useState<string | null>(null);
+  const [idleWarning, setIdleWarning] = useState<string | null>(null);
 
   const savedSession = getRoomSession(code || '');
   const passedFranchise = location.state?.franchise || savedSession.franchise || '';
@@ -136,7 +139,15 @@ export default function Lobby() {
     });
 
     s.on('room_cancelled', (data) => {
-      setError(data.message || 'Room was cancelled by the host.');
+      const reason = data.reason;
+      const msg = data.message || 'This room has been closed.';
+      setError(msg);
+      // Navigate back to home so the user isn't stuck on a dead lobby
+      setTimeout(() => navigate('/'), reason === 'idle_timeout' ? 5000 : 3000);
+    });
+
+    s.on('lobby_idle_warning', (data) => {
+      setIdleWarning(data.message || 'This lobby has been idle and will be automatically closed soon.');
     });
 
     s.on('kicked_from_room', (data) => {
@@ -214,8 +225,10 @@ export default function Lobby() {
     s.on('error', (err) => {
       setError(err.message || 'Lobby error');
       setSwitchError(err.message || 'Could not switch team');
+      setCloseRoomError(err.message || 'Could not close room');
       setSwitching(null);
       setTimeout(() => setSwitchError(null), 4000);
+      setTimeout(() => setCloseRoomError(null), 5000);
     });
 
     return () => {
@@ -354,6 +367,13 @@ export default function Lobby() {
     }
   };
 
+  const confirmCloseRoom = () => {
+    if (socket && code) {
+      socket.emit('host_cancel_room', { roomCode: code });
+      setShowCloseRoomModal(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#090D16] text-[#DFE2EF] p-4 sm:p-6 max-w-6xl mx-auto flex flex-col justify-between font-sans">
       {/* ── Header ── */}
@@ -393,6 +413,19 @@ export default function Lobby() {
           <div className="mb-4 p-3 bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#FFB4AB] rounded-[6px] text-xs font-medium flex items-center gap-2">
             <AlertCircle size={15} className="text-[#EF4444]" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {idleWarning && (
+          <div className="mb-4 p-3 bg-[#F59E0B]/15 border border-[#F59E0B]/50 text-[#FFDB93] rounded-[6px] text-xs font-medium flex items-start gap-2">
+            <AlertCircle size={15} className="text-[#F59E0B] shrink-0 mt-px" />
+            <div className="flex-1">
+              <span className="font-bold text-[#F59E0B] block mb-0.5">⚠ Lobby Idle Warning</span>
+              <span>{idleWarning}</span>
+            </div>
+            <button onClick={() => setIdleWarning(null)} className="text-[#86948A] hover:text-white transition cursor-pointer shrink-0 ml-1">
+              <X size={13} />
+            </button>
           </div>
         )}
 
@@ -683,29 +716,39 @@ export default function Lobby() {
           <p className="text-xs text-[#86948A]">
             {participantCount < 2 ? '⚠ Need at least 2 teams to start' : `${participantCount} teams ready — good to go!`}
           </p>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
             {isLobby && (
-              aiCount > 0 ? (
-                <GameButton
-                  onClick={clearBots}
-                  variant="secondary"
-                  size="lg"
-                  className="w-full sm:w-auto"
-                  icon={<BotsAiIcon size={16} color="#EF4444" />}
+              <>
+                {aiCount > 0 ? (
+                  <GameButton
+                    onClick={clearBots}
+                    variant="secondary"
+                    size="lg"
+                    className="w-full sm:w-auto"
+                    icon={<BotsAiIcon size={16} color="#EF4444" />}
+                  >
+                    CLEAR BOTS
+                  </GameButton>
+                ) : (
+                  <GameButton
+                    onClick={fillWithBots}
+                    variant="secondary"
+                    size="lg"
+                    className="w-full sm:w-auto"
+                    icon={<BotsAiIcon size={16} color="#06B6D4" />}
+                  >
+                    FILL WITH BOTS
+                  </GameButton>
+                )}
+                <button
+                  onClick={() => setShowCloseRoomModal(true)}
+                  className="px-3 py-2 rounded-[6px] bg-[#EF4444]/10 border border-[#EF4444]/30 hover:bg-[#EF4444]/20 hover:border-[#EF4444]/60 text-[#EF4444] text-xs font-display font-bold uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer"
+                  title="Close this room permanently"
                 >
-                  CLEAR BOTS
-                </GameButton>
-              ) : (
-                <GameButton
-                  onClick={fillWithBots}
-                  variant="secondary"
-                  size="lg"
-                  className="w-full sm:w-auto"
-                  icon={<BotsAiIcon size={16} color="#06B6D4" />}
-                >
-                  FILL WITH BOTS
-                </GameButton>
-              )
+                  <X size={13} />
+                  CLOSE ROOM
+                </button>
+              </>
             )}
             <GameButton
               onClick={startAuction}
@@ -725,6 +768,46 @@ export default function Lobby() {
         <div className="mt-4 pt-3 border-t border-[#1F2937] text-center text-xs text-[#86948A] flex items-center justify-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping"></span>
           <span>Awaiting host to start the auction...</span>
+        </div>
+      )}
+
+      {/* ── Close Room Confirmation Modal ── */}
+      {showCloseRoomModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#111827] border border-[#EF4444]/40 rounded-[10px] w-full max-w-sm p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-[#1F2937]">
+              <AlertCircle size={18} className="text-[#EF4444]" />
+              <h3 className="font-display font-extrabold text-sm text-white uppercase tracking-wider">Close Room</h3>
+            </div>
+            <div className="space-y-2 text-xs text-[#DFE2EF]">
+              <p>Are you sure you want to <span className="font-bold text-[#EF4444]">permanently close</span> room <span className="font-mono font-bold text-[#10B981]">#{code}</span>?</p>
+              <ul className="list-disc list-inside text-[#86948A] space-y-1 pt-1">
+                <li>All participants will be notified and returned to Home.</li>
+                <li>The room will be hidden from all room lists.</li>
+                <li>A record is kept for auditing purposes.</li>
+                <li className="text-[#F59E0B]">This action cannot be undone.</li>
+              </ul>
+            </div>
+            {closeRoomError && (
+              <div className="p-2.5 rounded-[4px] bg-[#EF4444]/15 border border-[#EF4444]/40 text-[#FFB4AB] text-xs font-mono">
+                {closeRoomError}
+              </div>
+            )}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { setShowCloseRoomModal(false); setCloseRoomError(null); }}
+                className="flex-1 px-4 py-2 rounded-[6px] bg-[#1F2937] hover:bg-[#374151] text-xs font-display font-bold text-white uppercase transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmCloseRoom}
+                className="flex-1 px-4 py-2 rounded-[6px] bg-[#EF4444] hover:bg-[#DC2626] text-white text-xs font-display font-bold uppercase tracking-wider transition cursor-pointer"
+              >
+                Close Room
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

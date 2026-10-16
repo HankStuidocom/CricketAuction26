@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../config';
+import { touchActivity, cancelRoomByHost, getLobbyRoomsNeedingWarning, getLobbyRoomsToAutoClose, autoExpireLobbyRoom, markIdleWarned, purgeOldCancelledLobbies } from '../services/roomCleanup';
 import { Room, RoomParticipant } from '../types';
 
 export function buildFullRoomState(roomCode: string) {
@@ -119,6 +120,8 @@ function logEvent(roomId: string, type: string, payload: any) {
     INSERT INTO auction_events (id, room_id, event_type, payload, created_at)
     VALUES (?, ?, ?, ?, ?)
   `).run(crypto.randomUUID(), roomId, type, JSON.stringify(payload), Date.now());
+  // Refresh activity timestamp on every meaningful room event
+  touchActivity(roomId);
 }
 
 function scheduleAIBidding(io: Server, roomCode: string) {
@@ -437,6 +440,9 @@ export function setupSocketHandlers(io: Server) {
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return socket.emit('error', { message: 'Room not found' });
+      if (room.status === 'CANCELLED') {
+        return socket.emit('error', { message: 'This auction room has been closed' });
+      }
       socket.join(normalizedCode);
       const state = buildFullRoomState(normalizedCode);
       if (state) {
@@ -449,6 +455,10 @@ export function setupSocketHandlers(io: Server) {
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return socket.emit('error', { message: 'Room not found' });
+
+      if (room.status !== 'LOBBY') {
+        return socket.emit('error', { message: 'Auction can only be started from the lobby' });
+      }
 
       if (!checkHostAuthority(room, socket)) {
         return socket.emit('error', { message: 'Only host or commissioner can start the auction' });
@@ -754,13 +764,29 @@ export function setupSocketHandlers(io: Server) {
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      if (!checkHostAuthority(room, socket)) return socket.emit('error', { message: 'Only host or commissioner can cancel the room' });
+      if (!checkHostAuthority(room, socket)) {
+        return socket.emit('error', { message: 'Only the host or Game Manager can close this room' });
+      }
+      if (room.status !== 'LOBBY') {
+        return socket.emit('error', {
+          message: 'Only an unstarted lobby can be closed here. Use "End Auction" to conclude a live game.'
+        });
+      }
 
-      db.prepare('UPDATE rooms SET status = ?, bid_deadline = NULL WHERE id = ?').run('CANCELLED', room.id);
-      logEvent(room.id, 'room_cancelled', { by: socket.data.userId });
-      emitRoomState(io, normalizedCode);
-      io.to(normalizedCode).emit('room_cancelled', { message: 'Room has been cancelled by host' });
+      const cancelledBy = socket.data.userId || 'host';
+      const cancelled = cancelRoomByHost(room.id, cancelledBy);
+      if (!cancelled) {
+        return socket.emit('error', { message: 'Room could not be closed. It may have already started or been cancelled.' });
+      }
+
+      logEvent(room.id, 'room_cancelled', { by: cancelledBy, method: 'host_manual' });
+      io.to(normalizedCode).emit('room_cancelled', {
+        message: 'The host has closed this room.',
+        reason: 'host_closed'
+      });
       io.emit('rooms_updated', { roomCode: normalizedCode, status: 'CANCELLED' });
+      // Disconnect all sockets from the room channel so it goes quiet cleanly
+      io.socketsLeave(normalizedCode);
     });
 
     socket.on('send_chat', (data) => {
@@ -953,4 +979,49 @@ export function setupSocketHandlers(io: Server) {
       }
     }
   }, 500);
+
+  // ── Idle Lobby Cleanup ── runs every 30 minutes
+  // SAFETY: only targets LOBBY rooms that never started (auction_started_at IS NULL).
+  // Never touches LIVE, PAUSED, FINAL_ROUND, or COMPLETED rooms regardless of disconnects.
+  setInterval(() => {
+    try {
+      // Step 1: Warn hosts of rooms approaching the idle expiry threshold
+      const toWarn = getLobbyRoomsNeedingWarning();
+      for (const roomId of toWarn) {
+        const room = db.prepare('SELECT room_code FROM rooms WHERE id = ?').get(roomId) as any;
+        if (!room) continue;
+        markIdleWarned(roomId);
+        io.to(room.room_code).emit('lobby_idle_warning', {
+          message: 'This lobby has been idle for almost 24 hours and will be automatically closed soon unless activity resumes.',
+          roomCode: room.room_code
+        });
+        console.log(`[Cleanup] Idle warning sent to lobby ${room.room_code}`);
+      }
+
+      // Step 2: Auto-close lobbies that have passed the expiry threshold
+      const toClose = getLobbyRoomsToAutoClose();
+      for (const roomId of toClose) {
+        const room = db.prepare('SELECT room_code FROM rooms WHERE id = ?').get(roomId) as any;
+        if (!room) continue;
+        const expired = autoExpireLobbyRoom(roomId, 'auto_idle_expiry');
+        if (expired) {
+          console.log(`[Cleanup] Auto-closed idle lobby ${room.room_code}`);
+          io.to(room.room_code).emit('room_cancelled', {
+            message: 'This lobby was automatically closed after 24 hours of inactivity.',
+            reason: 'idle_timeout'
+          });
+          io.emit('rooms_updated', { roomCode: room.room_code, status: 'CANCELLED' });
+          io.socketsLeave(room.room_code);
+        }
+      }
+
+      // Step 3: Permanently purge old cancelled lobbies (no bids, no squad, older than 30 days)
+      const purged = purgeOldCancelledLobbies();
+      if (purged > 0) {
+        console.log(`[Cleanup] Permanently removed ${purged} old cancelled lobby room(s)`);
+      }
+    } catch (err: any) {
+      console.error('[Cleanup] Idle lobby cleanup error:', err.message);
+    }
+  }, 30 * 60 * 1000); // every 30 minutes
 }

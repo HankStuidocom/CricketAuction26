@@ -66,6 +66,10 @@ export interface Room {
   auction_started_at: number | null;
   completed_at: number | null;
   idempotency_key?: string | null;
+  last_activity_at?: number | null;
+  cancelled_at?: number | null;
+  cancelled_by?: string | null;
+  idle_warned_at?: number | null;
   created_at: number;
 }
 

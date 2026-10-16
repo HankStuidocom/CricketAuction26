@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../config';
 import { advanceToNextPlayer } from '../services/auctionEngine';
 import { emitRoomState, buildFullRoomState } from '../socket/roomHandlers';
+import { touchActivity } from '../services/roomCleanup';
 import { Room } from '../types';
 
 const router = Router();
@@ -86,7 +87,7 @@ router.get('/', (req, res) => {
       const sanitized = statusParam.replace(/[^A-Z_]/g, '');
       query += ` AND status = '${sanitized}'`;
     } else {
-      query += ` AND status IN ('LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED', 'COMPLETED', 'CANCELLED')`;
+      query += ` AND status IN ('LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED', 'COMPLETED')`;
     }
     query += ' ORDER BY created_at DESC LIMIT 50';
     const rooms = db.prepare(query).all() as any[];
@@ -113,6 +114,7 @@ router.get('/my/private', (req, res) => {
       LEFT JOIN room_participants rp ON rp.room_id = r.id AND rp.user_id = ?
       LEFT JOIN room_invites ri ON ri.room_id = r.id AND ri.receiver_id = ?
       WHERE r.is_private = 1 
+        AND r.status != 'CANCELLED'
         AND (r.host_id = ? OR rp.user_id IS NOT NULL OR ri.receiver_id IS NOT NULL)
         AND r.room_code NOT LIKE 'TEST%'
         AND r.room_code NOT LIKE 'ID%'
@@ -184,6 +186,9 @@ router.post('/', (req, res) => {
       idempotencyKey || null,
       Date.now()
     );
+
+    // Initialise activity timestamp so idle timer starts from room creation
+    touchActivity(roomId);
 
     // A Game Manager hosts the arena without occupying a franchise slot or purse.
     // A normal host remains a playing franchise and keeps the existing host controls.

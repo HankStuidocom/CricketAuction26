@@ -56,6 +56,10 @@ export function initializeDatabase() {
       bid_deadline INTEGER,
       auction_started_at INTEGER,
       completed_at INTEGER,
+      last_activity_at INTEGER,
+      cancelled_at INTEGER,
+      cancelled_by TEXT,
+      idle_warned_at INTEGER,
       created_at INTEGER NOT NULL,
       FOREIGN KEY (host_id) REFERENCES users(id)
     );
@@ -200,4 +204,9 @@ export function initializeDatabase() {
   safeAlter('ALTER TABLE users ADD COLUMN mega_count INTEGER DEFAULT 0');
   safeAlter('ALTER TABLE users ADD COLUMN blitz_count INTEGER DEFAULT 0');
   safeAlter('ALTER TABLE users ADD COLUMN likes_count INTEGER DEFAULT 0');
+  // Room cleanup & activity tracking columns (safe to re-run)
+  safeAlter('ALTER TABLE rooms ADD COLUMN last_activity_at INTEGER');
+  safeAlter('ALTER TABLE rooms ADD COLUMN cancelled_at INTEGER');
+  safeAlter('ALTER TABLE rooms ADD COLUMN cancelled_by TEXT');
+  safeAlter('ALTER TABLE rooms ADD COLUMN idle_warned_at INTEGER');
 }
