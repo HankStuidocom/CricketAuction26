@@ -415,6 +415,12 @@ export default function Home() {
     return isPublic && r.status === 'LOBBY';
   });
 
+  // Active Public Rooms (Lobby + Live + Paused)
+  const activePublicRooms = publicRooms.filter(r => {
+    const isPublic = !r.is_private || r.is_private === 0;
+    return isPublic && ['LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED'].includes(r.status);
+  });
+
   // Top Featured Room (Topmost active public live room)
   const featuredRoom = publicLiveRooms[0] || null;
 
@@ -841,7 +847,7 @@ export default function Home() {
                     : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
                 }`}
               >
-                Public Room ({publicRooms.length})
+                Public Room ({activePublicRooms.length})
               </button>
               <button
                 onClick={() => { setMatchesFilter('private'); fetchPrivateRooms(); }}
@@ -864,12 +870,12 @@ export default function Home() {
             {/* TAB: PUBLIC ROOMS */}
             {matchesFilter === 'public' && (
               <div className="space-y-2.5">
-                {roomsLoading && publicRooms.length === 0 ? (
+                {roomsLoading && activePublicRooms.length === 0 ? (
                   <div className="p-8 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
                     <RefreshCw size={20} className="animate-spin text-[#10B981] mx-auto mb-2" />
                     <span className="text-xs text-[#86948A] font-mono">Syncing public rooms...</span>
                   </div>
-                ) : publicRooms.length === 0 ? (
+                ) : activePublicRooms.length === 0 ? (
                   <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
                     <p className="text-xs text-[#86948A] mb-3 font-mono">No public rooms active right now.</p>
                     <GameButton
@@ -881,7 +887,7 @@ export default function Home() {
                     </GameButton>
                   </div>
                 ) : (
-                  publicRooms.map((r: any) => {
+                  activePublicRooms.map((r: any) => {
                     const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(r.status);
                     const isPaused = r.status === 'PAUSED';
                     const isWaiting = r.status === 'LOBBY';

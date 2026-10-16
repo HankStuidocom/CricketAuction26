@@ -197,6 +197,17 @@ async function runTests() {
   const updatedUserA = db.prepare('SELECT likes_count FROM users WHERE id = ?').get(userA) as any;
   assert(updatedUserA?.likes_count === 1, 'Profile: Profile like registered and incremented');
 
+  // Clean up all test artifacts so database stays completely clean
+  db.prepare('DELETE FROM squad_players WHERE room_id = ?').run(roomId);
+  db.prepare('DELETE FROM bids WHERE room_id = ?').run(roomId);
+  db.prepare('DELETE FROM auction_queue WHERE room_id = ?').run(roomId);
+  db.prepare('DELETE FROM room_participants WHERE room_id = ?').run(roomId);
+  db.prepare('DELETE FROM rooms WHERE id IN (?, ?, ?)').run(roomId, testIdemRoomId, privRoomId);
+  db.prepare('DELETE FROM friendships WHERE user_id IN (?, ?)').run(userA, userB);
+  db.prepare('DELETE FROM friend_requests WHERE sender_id IN (?, ?)').run(userA, userB);
+  db.prepare('DELETE FROM profile_likes WHERE target_user_id IN (?, ?)').run(userA, userB);
+  db.prepare('DELETE FROM users WHERE id IN (?, ?)').run(userA, userB);
+
   console.log(`\n=== TEST SUITE COMPLETE: ${passed} PASSED, ${failed} FAILED ===`);
   if (failed > 0) process.exit(1);
 }

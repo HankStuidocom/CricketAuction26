@@ -70,7 +70,18 @@ function enrichRoom(room: any) {
 router.get('/', (req, res) => {
   try {
     const liveOnly = req.query.live === 'true' || req.query.status === 'IN_PROGRESS' || req.query.status === 'LIVE';
-    let query = 'SELECT * FROM rooms WHERE is_private = 0';
+    let query = `
+      SELECT * FROM rooms 
+      WHERE is_private = 0 
+        AND status IN ('LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED')
+        AND room_code NOT LIKE 'TEST%'
+        AND room_code NOT LIKE 'ID%'
+        AND room_code NOT LIKE 'PR%'
+        AND room_name NOT LIKE '%Test%'
+        AND room_name NOT LIKE '%Arena%'
+        AND room_name NOT LIKE 'Room CV2SNY'
+        AND room_name NOT LIKE 'Multiplayer Reliability%'
+    `;
     if (liveOnly) {
       query += ' AND status IN ("IN_PROGRESS", "LIVE", "FINAL_ROUND", "PAUSED")';
     }
@@ -98,7 +109,14 @@ router.get('/my/private', (req, res) => {
       SELECT DISTINCT r.* FROM rooms r
       LEFT JOIN room_participants rp ON rp.room_id = r.id AND rp.user_id = ?
       LEFT JOIN room_invites ri ON ri.room_id = r.id AND ri.receiver_id = ?
-      WHERE r.is_private = 1 AND (r.host_id = ? OR rp.user_id IS NOT NULL OR ri.receiver_id IS NOT NULL)
+      WHERE r.is_private = 1 
+        AND (r.host_id = ? OR rp.user_id IS NOT NULL OR ri.receiver_id IS NOT NULL)
+        AND r.status IN ('LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED')
+        AND r.room_code NOT LIKE 'TEST%'
+        AND r.room_code NOT LIKE 'ID%'
+        AND r.room_code NOT LIKE 'PR%'
+        AND r.room_name NOT LIKE '%Test%'
+        AND r.room_name NOT LIKE '%Arena%'
       ORDER BY r.created_at DESC LIMIT 50
     `).all(userId, userId, userId) as any[];
 

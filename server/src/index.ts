@@ -54,6 +54,31 @@ async function startServer() {
   await db.init();
   initializeDatabase();
 
+  // Purge any pre-existing dummy/stale/completed rooms so only real player-created rooms appear
+  try {
+    const dummyFilter = `
+      status IN ('COMPLETED', 'CANCELLED')
+      OR room_code LIKE 'TEST%'
+      OR room_code LIKE 'ID%'
+      OR room_code LIKE 'PR%'
+      OR room_name LIKE '%Arena%'
+      OR room_name LIKE '%Test%'
+      OR room_name LIKE 'Room CV2SNY'
+      OR room_name LIKE 'Multiplayer Reliability%'
+      OR created_at < 1792154000000
+    `;
+    db.prepare(`DELETE FROM squad_players WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
+    db.prepare(`DELETE FROM bids WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
+    db.prepare(`DELETE FROM auction_queue WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
+    db.prepare(`DELETE FROM room_participants WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
+    db.prepare(`DELETE FROM room_invites WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
+    db.prepare(`DELETE FROM auction_events WHERE room_id IN (SELECT id FROM rooms WHERE ${dummyFilter})`).run();
+    const purged = db.prepare(`DELETE FROM rooms WHERE ${dummyFilter}`).run();
+    console.log(`[Database] Purged legacy dummy rooms on startup (${purged.changes || 0} removed)`);
+  } catch (err: any) {
+    console.warn('[Database] Purge warning:', err.message);
+  }
+
   // Import on first run
   const playersCount = db.prepare('SELECT COUNT(*) as count FROM players').get() as { count: number };
   if (!playersCount || playersCount.count === 0) {
