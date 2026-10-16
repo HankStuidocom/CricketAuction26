@@ -12,7 +12,7 @@ import {
   PlayArrowIcon, 
   ShareInviteIcon 
 } from '../components/GameIcons';
-import { ArrowLeft, Copy, Check, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Copy, Check, AlertCircle, RefreshCw, UserPlus, X, Users } from 'lucide-react';
 import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
 export default function Lobby() {
@@ -28,6 +28,12 @@ export default function Lobby() {
   const [error, setError] = useState<string | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [switching, setSwitching] = useState<string | null>(null); // franchise being switched to
+
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [friendsList, setFriendsList] = useState<any[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const [invitedMap, setInvitedMap] = useState<Record<string, boolean>>({});
+  const [inviteStatusMsg, setInviteStatusMsg] = useState<string | null>(null);
 
   const savedSession = getRoomSession(code || '');
   const passedFranchise = location.state?.franchise || savedSession.franchise || 'CSK';
@@ -211,6 +217,38 @@ export default function Lobby() {
     }
   };
 
+  const fetchFriendsForInvite = async () => {
+    const token = localStorage.getItem('ca26_token');
+    if (!token) return;
+    setFriendsLoading(true);
+    try {
+      const list = await safeFetch<any[]>('/api/friends');
+      if (Array.isArray(list)) {
+        setFriendsList(list);
+      }
+    } catch (err: any) {
+      console.error('Failed to load friends:', err);
+    } finally {
+      setFriendsLoading(false);
+    }
+  };
+
+  const handleSendRoomInvite = async (friendId: string, friendName: string) => {
+    if (!code) return;
+    try {
+      await safeFetch('/api/friends/invite', {
+        method: 'POST',
+        body: JSON.stringify({ roomCode: code.trim().toUpperCase(), friendId })
+      });
+      setInvitedMap((prev) => ({ ...prev, [friendId]: true }));
+      setInviteStatusMsg(`Invite sent to ${friendName}!`);
+      setTimeout(() => setInviteStatusMsg(null), 3000);
+    } catch (err: any) {
+      setInviteStatusMsg(err.message || 'Failed to send invite');
+      setTimeout(() => setInviteStatusMsg(null), 3000);
+    }
+  };
+
   const isHost = room?.host_id === myUserId;
   const isLobby = room?.status === 'LOBBY';
   const participantCount = room?.participants?.length || 0;
@@ -309,7 +347,18 @@ export default function Lobby() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <GameButton
+              onClick={() => {
+                setShowInviteModal(true);
+                fetchFriendsForInvite();
+              }}
+              variant="secondary"
+              size="sm"
+              icon={<UserPlus size={14} className="text-[#10B981]" />}
+            >
+              Invite Friends
+            </GameButton>
             <GameButton
               onClick={() => fetchRoomDetails()}
               variant="secondary"
@@ -542,6 +591,109 @@ export default function Lobby() {
         <div className="mt-4 pt-3 border-t border-[#1F2937] text-center text-xs text-[#86948A] flex items-center justify-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping"></span>
           <span>Awaiting host to start the auction...</span>
+        </div>
+      )}
+
+      {/* ── Invite Friends Modal ── */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#111827] border border-[#1F2937] rounded-[8px] w-full max-w-md p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#1F2937]">
+              <div className="flex items-center gap-2">
+                <Users size={18} className="text-[#10B981]" />
+                <h3 className="font-display font-extrabold text-sm text-white uppercase tracking-wider">
+                  Invite Friends to Room #{code}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="w-7 h-7 rounded-[4px] bg-[#1F2937] text-[#86948A] hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {inviteStatusMsg && (
+              <div className="p-2.5 rounded-[4px] bg-[#10B981]/20 border border-[#10B981]/40 text-[#10B981] text-xs font-mono font-bold text-center">
+                {inviteStatusMsg}
+              </div>
+            )}
+
+            {!localStorage.getItem('ca26_token') ? (
+              <div className="py-6 text-center space-y-2">
+                <p className="text-xs text-[#86948A] font-mono">Sign in to invite your friends directly from your social list.</p>
+                <button
+                  onClick={() => navigate('/login')}
+                  className="px-4 py-1.5 rounded-[4px] bg-[#10B981] text-[#090D16] font-display font-bold text-xs uppercase cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
+            ) : friendsLoading ? (
+              <div className="py-8 text-center">
+                <RefreshCw size={20} className="animate-spin text-[#10B981] mx-auto mb-2" />
+                <span className="text-xs text-[#86948A] font-mono">Loading friends...</span>
+              </div>
+            ) : friendsList.length === 0 ? (
+              <div className="py-6 text-center space-y-1">
+                <p className="text-xs text-[#86948A] font-mono">No friends found.</p>
+                <small className="text-[11px] text-[#6B7280] block">Add friends using their Player Tag from the Home Friends tab.</small>
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                {friendsList.map((f) => {
+                  const isInvited = invitedMap[f.id];
+                  return (
+                    <div
+                      key={f.id}
+                      className="p-2.5 bg-[#0F131C] border border-[#1F2937] rounded-[6px] flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative">
+                          <span className="text-lg">{f.avatar_emoji || '🏏'}</span>
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0F131C] ${
+                              f.is_online ? 'bg-[#10B981]' : 'bg-[#4B5563]'
+                            }`}
+                            title={f.is_online ? 'Online' : 'Offline'}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-display font-bold text-white block truncate">
+                            {f.display_name}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#86948A]">
+                            @{f.username} {f.is_online ? '· Online' : '· Offline'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleSendRoomInvite(f.id, f.display_name)}
+                        disabled={isInvited}
+                        className={`px-3 py-1 rounded-[4px] font-display font-bold text-xs uppercase tracking-wider transition ${
+                          isInvited
+                            ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/40 cursor-default'
+                            : 'bg-[#10B981] hover:bg-[#059669] text-[#090D16] cursor-pointer'
+                        }`}
+                      >
+                        {isInvited ? 'Invited ✓' : 'Invite'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-[#1F2937] flex justify-end">
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="px-4 py-1.5 rounded-[4px] bg-[#1F2937] hover:bg-[#374151] text-xs font-display font-bold text-white uppercase transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
