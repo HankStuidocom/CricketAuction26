@@ -126,9 +126,6 @@ export default function JoinAuction() {
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-inner">
-            <CricketBatBallIcon size={16} color="#10B981" />
-          </div>
           <span className="font-display font-bold text-lg tracking-tight text-white">
             CRICK<span className="text-[#10B981]">AUCTION</span>
           </span>
@@ -146,10 +143,10 @@ export default function JoinAuction() {
             <ShieldCrestIcon size={24} color="#06B6D4" />
           </div>
           <h1 className="text-xl sm:text-2xl font-display font-black tracking-tight text-white uppercase">
-            Join Tactical Arena
+            Join Room
           </h1>
           <p className="text-xs text-[#86948A] mt-1">
-            Enter the 6-character room code, then pick your franchise
+            Enter the 6-character room code to join
           </p>
         </div>
 
@@ -165,7 +162,7 @@ export default function JoinAuction() {
           {/* ── STEP 1: Room Code ── */}
           <div>
             <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 text-center">
-              Arena Access Code
+              Room Code
             </label>
             <div className="relative">
               <input
@@ -250,11 +247,11 @@ export default function JoinAuction() {
             />
           </div>
 
-          {/* ── Franchise Selector — only after room is found ── */}
+          {/* ── Team Selector — only after room is found ── */}
           {roomInfo && (
             <div>
               <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-2 flex items-center justify-between">
-                <span>Select Your Franchise</span>
+                <span>Select Team</span>
                 {selectedFranchise && (
                   <span className="text-[#10B981] font-mono font-bold text-xs">{selectedFranchise} ✓</span>
                 )}
@@ -294,14 +291,14 @@ export default function JoinAuction() {
                       </div>
                       <div className="text-[10px] font-display font-black tracking-wider mt-1">{f.id}</div>
                       {isTaken && (
-                        <div className="text-[8px] text-[#EF4444] truncate w-full text-center font-bold">TAKEN</div>
+                        <div className="text-[8px] text-[#EF4444] truncate w-full text-center font-bold">PICKED</div>
                       )}
                     </button>
                   );
                 })}
               </div>
               <p className="text-[11px] text-[#86948A] mt-2 text-center">
-                Red slots are taken · Grey slots are available · You can change in lobby
+                Red slots are picked · Grey slots are open
               </p>
             </div>
           )}
@@ -317,7 +314,7 @@ export default function JoinAuction() {
               fullWidth
               icon={<GavelIcon size={18} color="#090D16" />}
             >
-              {!roomInfo ? 'FIND ROOM FIRST (ENTER CODE)' : `ENTER AS ${selectedFranchise || '...'}`}
+              {!roomInfo ? 'ENTER ROOM CODE FIRST' : `JOIN AS ${selectedFranchise || '...'}`}
             </GameButton>
           </div>
         </form>

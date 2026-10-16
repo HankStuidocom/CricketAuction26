@@ -130,10 +130,10 @@ export default function Results() {
           <TrophyCupIcon size={40} color="#F59E0B" />
         </div>
         <h1 className="text-2xl sm:text-3xl font-display font-black tracking-tight text-white uppercase">
-          Tournament Complete
+          Auction Complete
         </h1>
         <p className="text-xs sm:text-sm text-[#86948A] mt-1 max-w-md mx-auto">
-          The auction gavel has dropped. Review the final tournament standings, squad strength ratings, marquee signings, and capital allocations.
+          The auction has ended. Review final standings, squad ratings, marquee buys, and purse allocations.
         </p>
 
         {championTeam && (
@@ -525,7 +525,7 @@ export default function Results() {
           icon={<ArrowLeft size={16} />}
           className="w-full sm:w-auto"
         >
-          Return to Arena Command
+          Return to Home
         </GameButton>
 
         <GameButton
@@ -535,7 +535,7 @@ export default function Results() {
           icon={<GavelIcon size={16} />}
           className="w-full sm:w-auto"
         >
-          Host New Tournament
+          Host New Game
         </GameButton>
       </div>
 

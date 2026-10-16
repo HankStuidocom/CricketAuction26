@@ -88,11 +88,11 @@ export default function Lobby() {
       } else if (data.code === 'ROOM_CANCELLED') {
         friendlyMsg = 'This auction room has been cancelled by the host.';
       } else if (data.code === 'INVALID_PASSWORD') {
-        friendlyMsg = 'Incorrect password for this private arena.';
+        friendlyMsg = 'Incorrect password for this private room.';
       } else if (data.code === 'FRANCHISE_TAKEN') {
-        friendlyMsg = data.message || 'This franchise is already taken by another player.';
+        friendlyMsg = data.message || 'This team is already taken by another player.';
       } else if (data.code === 'ROOM_FULL') {
-        friendlyMsg = 'Arena is full (max teams reached).';
+        friendlyMsg = 'Room is full (max teams reached).';
       }
       setError(friendlyMsg);
     });
@@ -371,7 +371,7 @@ export default function Lobby() {
         <div className="mb-5">
           <div className="flex justify-between items-center mb-2.5">
             <h3 className="font-display font-bold text-xs uppercase tracking-wider text-[#86948A]">
-              Tournament Franchise Slots ({participantCount}/{room?.max_teams || 10} Ready)
+              Team Slots ({participantCount}/{room?.max_teams || 10} Ready)
             </h3>
           </div>
 
@@ -389,7 +389,7 @@ export default function Lobby() {
                 <div
                   key={team.id}
                   onClick={() => canSwitch ? handleSwitchFranchise(team.id) : undefined}
-                  className={`p-3.5 rounded-[6px] border flex flex-col justify-between items-center text-center min-h-[150px] relative overflow-hidden transition-all duration-150 ${
+                  className={`p-3.5 rounded-[6px] border flex flex-col justify-between items-center text-center min-h-[145px] relative overflow-hidden transition-all duration-150 ${
                     isMyTeam
                       ? 'border-[#10B981] bg-[#1C1F29] shadow-[0_0_20px_rgba(16,185,129,0.2)]'
                       : isTakenByOther
@@ -417,24 +417,24 @@ export default function Lobby() {
                   {/* Badges */}
                   <div className="absolute top-2 right-2 flex gap-1">
                     {isMyTeam ? (
-                      <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#10B981] text-[#090D16] uppercase tracking-wider">
-                        PICKED
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#10B981] text-[#090D16] uppercase tracking-wider">
+                        YOU
                       </span>
                     ) : isTakenByOther ? (
-                      <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#EF4444]/15 text-[#FFB4AB] border border-[#EF4444]/30 uppercase tracking-wider">
-                        TAKEN
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 uppercase tracking-wider">
+                        PICKED
                       </span>
                     ) : isAITeam ? (
-                      <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30 uppercase tracking-wider">
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#06B6D4]/15 text-[#06B6D4] border border-[#06B6D4]/30 uppercase tracking-wider">
                         AI
                       </span>
                     ) : (
-                      <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#86948A]/15 text-[#86948A] border border-[#1F2937] uppercase tracking-wider">
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#86948A]/15 text-[#86948A] border border-[#1F2937] uppercase tracking-wider">
                         OPEN
                       </span>
                     )}
                     {participant?.is_host && !isMyTeam && (
-                      <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-mono font-bold bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 uppercase tracking-wider">
+                      <span className="px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 uppercase tracking-wider">
                         HOST
                       </span>
                     )}
@@ -467,9 +467,6 @@ export default function Lobby() {
                        isMyTeam ? passedDisplayName :
                        'Open Slot'}
                     </div>
-                    <div className="text-[10px] text-[#86948A] font-mono mt-0.5">
-                      {participant?.squad_count || 0}/{room?.max_squad_size || 10} players
-                    </div>
                     {participant && !isOpen && (
                       <div className="text-[10px] text-[#10B981] font-mono mt-0.5 font-bold">
                         {formatCr(participant.purse_remaining_lakhs)}
@@ -480,12 +477,6 @@ export default function Lobby() {
               );
             })}
           </div>
-
-          {isLobby && (
-            <p className="text-[11px] text-[#86948A] text-center mt-2">
-              {isGameManager ? 'Game Manager mode: you oversee every franchise without owning a team.' : '💡 Click any open slot to switch your team before the auction starts · Teams lock when auction begins'}
-            </p>
-          )}
         </div>
 
         {/* ── Chat ── */}
@@ -500,9 +491,11 @@ export default function Lobby() {
           </div>
 
           <div className="p-3 h-36 overflow-y-auto space-y-2 text-xs bg-[#0F131C]">
-            <div className="text-xs text-[#86948A] italic">
-              Chat open. Discuss strategy before bidding begins.
-            </div>
+            {chatMessages.length === 0 && (
+              <div className="text-xs text-[#86948A] italic">
+                No messages yet.
+              </div>
+            )}
             {chatMessages.map((m, idx) => (
               <div key={idx} className="flex gap-2 items-baseline">
                 <span className="font-display font-black text-[#10B981]">{m.sender}:</span>

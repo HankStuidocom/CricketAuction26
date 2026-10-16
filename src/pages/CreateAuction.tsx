@@ -36,7 +36,7 @@ export default function CreateAuction() {
   });
 
   // Step 2: Settings
-  const [roomName, setRoomName] = useState('IPL 2026 Mega Arena');
+  const [roomName, setRoomName] = useState('IPL 2026 Room');
   const [isPrivate, setIsPrivate] = useState(false);
   const [password, setPassword] = useState('');
   const [maxTeams, setMaxTeams] = useState(10);
@@ -193,11 +193,6 @@ export default function CreateAuction() {
             {step === 2 && 'Room Settings'}
             {step === 3 && 'Review & Create'}
           </h1>
-          <p className="text-xs text-[#86948A] mt-0.5">
-            {step === 1 && 'Choose a playing team, or join as the non-playing Game Manager.'}
-            {step === 2 && 'Define starting purse, squad limits, timers, and AI teams.'}
-            {step === 3 && 'Review your auction settings and create the room.'}
-          </p>
         </div>
       </div>
 
@@ -248,8 +243,8 @@ export default function CreateAuction() {
 
             <div>
               <label className="block text-xs font-display font-bold uppercase tracking-wider text-[#86948A] mb-3 flex items-center justify-between">
-                <span>Select Role {isGameManager ? '(Game Manager selected)' : `(Selected: ${selectedTeamData.name})`}</span>
-                <span className="text-[#10B981] font-mono text-[11px]">10 TEAMS + MANAGER</span>
+                <span>Select Team</span>
+                <span className="text-[#10B981] font-mono text-[11px]">10 TEAMS + ADMIN</span>
               </label>
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -379,7 +374,7 @@ export default function CreateAuction() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { id: '40', label: 'Blitz 40', sub: '~15 mins match' },
-                    { id: '80', label: 'Standard 80', sub: '~30 mins tournament' },
+                    { id: '80', label: 'Standard 80', sub: '~30 mins game' },
                     { id: '250', label: 'Mega 250', sub: 'Full player pool' },
                     { id: 'CUSTOM', label: 'Custom Pool', sub: 'Manual count' },
                   ].map((preset) => (
@@ -509,7 +504,7 @@ export default function CreateAuction() {
                 >
                   <div className="flex items-center gap-2">
                     <PrivateLockIcon size={15} color={isPrivate ? '#06B6D4' : '#86948A'} />
-                    <span className="text-xs font-bold">{isPrivate ? 'Private (Password Required)' : 'Public Arena (Open)'}</span>
+                    <span className="text-xs font-bold">{isPrivate ? 'Private (Password Required)' : 'Public Room'}</span>
                   </div>
                   <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center ${isPrivate ? 'border-[#06B6D4] bg-[#06B6D4]' : 'border-[#1F2937]'}`}>
                     {isPrivate && <CheckmarkIcon size={10} color="#003640" />}

@@ -143,7 +143,7 @@ export default function CommissionerControlRoom({
                   Active Lot Under Hammer: {activePlayerDetails.player_name}
                 </span>
                 <p className="text-[11px] text-[#DFE2EF] leading-relaxed">
-                  Choose how to settle this player card before ending the tournament:
+                  Choose how to settle this player card before ending the game:
                 </p>
                 <div className="grid grid-cols-1 gap-2 pt-1">
                   {currentBidder && currentBid > 0 && (
@@ -218,10 +218,10 @@ export default function CommissionerControlRoom({
               <span className="px-2 py-0.5 rounded-[4px] bg-[#F59E0B]/20 border border-[#F59E0B]/40 text-[#FFB95F] text-[10px] font-mono font-bold uppercase tracking-wider">
                 AUCTION COMMISSIONER DESK
               </span>
-              <span className="text-[10px] text-[#86948A] font-mono font-bold">ARENA #{code}</span>
+              <span className="text-[10px] text-[#86948A] font-mono font-bold">ROOM #{code}</span>
             </div>
             <h2 className="font-display font-black text-base sm:text-lg text-white mt-0.5">
-              {roomState?.room_name || `Tournament #${code}`} · <span className="text-[#10B981] font-mono text-sm">{roomState?.participants?.length || 0}/{roomState?.max_teams || 10} Franchises Active</span>
+              {roomState?.room_name || `Room #${code}`} · <span className="text-[#10B981] font-mono text-sm">{roomState?.participants?.length || 0}/{roomState?.max_teams || 10} Teams Active</span>
             </h2>
           </div>
         </div>
@@ -342,7 +342,7 @@ export default function CommissionerControlRoom({
                   onClick={() => setConfirmModal({
                     open: true,
                     type: 'unsold',
-                    message: `Mark ${activePlayerDetails?.player_name || 'this player'} as permanently Unsold? This player will be archived in the Unsold Pool and will not return during this tournament.`
+                    message: `Mark ${activePlayerDetails?.player_name || 'this player'} as permanently Unsold? This player will be archived in the Unsold Pool and will not return during this game.`
                   })}
                   disabled={!activePlayerDetails}
                   className="p-2.5 rounded-[4px] bg-[#EF4444]/15 hover:bg-[#EF4444]/25 border border-[#EF4444]/40 text-[#FFB4AB] text-xs font-display font-bold flex flex-col items-center gap-1 transition active:scale-95 disabled:opacity-40"
@@ -555,7 +555,7 @@ export default function CommissionerControlRoom({
                           <div className="flex items-center gap-2">
                             <span className="font-display font-black text-sm" style={{ color: team.primary }}>{team.id}</span>
                             <span className="text-[10px] text-[#86948A]">
-                              {participant ? (participant.is_ai ? '🤖 Arena Bot' : participant.display_name) : 'Vacant Slot'}
+                              {participant ? (participant.is_ai ? '🤖 Bot' : participant.display_name) : 'Vacant Slot'}
                             </span>
                           </div>
                           <div className="text-[10px] text-[#86948A] font-mono mt-0.5">

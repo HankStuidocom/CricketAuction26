@@ -67,9 +67,6 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-[6px] bg-[#111827] border border-[#1F2937] flex items-center justify-center shadow-inner">
-            <CricketBatBallIcon size={16} color="#10B981" />
-          </div>
           <span className="font-display font-bold text-lg tracking-tight text-white">
             CRICK<span className="text-[#10B981]">AUCTION</span>
           </span>
@@ -87,10 +84,10 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
             <TrophyCupIcon size={26} color="#10B981" />
           </div>
           <h1 className="text-xl sm:text-2xl font-display font-black tracking-tight text-white uppercase">
-            {isRegister ? 'Create Player Profile' : 'Commander Access'}
+            {isRegister ? 'Create Account' : 'Player Login'}
           </h1>
           <p className="text-xs text-[#86948A] mt-1">
-            {isRegister ? 'Register your profile for IPL 2026 multiplayer arena draft' : 'Sign in to access your squad roster and tactical arena'}
+            {isRegister ? 'Register your player account' : 'Sign in to access your account'}
           </p>
         </div>
 
@@ -155,7 +152,7 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
               size="lg"
               fullWidth
             >
-              {isRegister ? 'INITIALIZE PROFILE' : 'ENTER COMMAND ARENA'}
+              {isRegister ? 'REGISTER' : 'SIGN IN'}
             </GameButton>
           </div>
         </form>
@@ -165,14 +162,14 @@ export default function AuthPage({ isRegister = false }: { isRegister?: boolean 
             <p>
               Already registered?{' '}
               <Link to="/login" className="text-[#10B981] font-bold hover:underline">
-                Sign in to your profile
+                Sign in to your account
               </Link>
             </p>
           ) : (
             <p>
-              New commander?{' '}
+              New player?{' '}
               <Link to="/register" className="text-[#10B981] font-bold hover:underline">
-                Create a player profile
+                Create an account
               </Link>
             </p>
           )}

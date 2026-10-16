@@ -255,14 +255,14 @@ export default function Home() {
               CRICK<span className="text-[#10B981]">·</span>AUCTION
             </h1>
             <p className="text-[11px] text-[#86948A] mb-5 tracking-widest uppercase font-mono font-bold">
-              IPL 2026 MULTIPLAYER ARENA
+              IPL 2026 MULTIPLAYER GAME
             </p>
 
             <button
               onClick={handleStartFromSplash}
               className="w-full py-3 bg-[#10B981] hover:bg-[#059669] text-[#090D16] rounded-[6px] font-display font-extrabold text-sm uppercase tracking-wider transition-all shadow-[0_0_24px_rgba(16,185,129,0.4)] cursor-pointer active:scale-95"
             >
-              ENTER ARENA
+              START GAME
             </button>
           </div>
         </div>
@@ -286,8 +286,8 @@ export default function Home() {
               <span className="text-[10px] font-bold font-mono tracking-wider text-[#10B981] uppercase block mt-0.5">
                 {activeTab === 'home' ? 'Live Match' : 
                  activeTab === 'matches' ? 'Match Cards' :
-                 activeTab === 'play' ? 'Arena Launchpad' :
-                 activeTab === 'friends' ? 'Franchise Friends' : 'Commander Profile'}
+                 activeTab === 'play' ? 'Play' :
+                 activeTab === 'friends' ? 'Teams' : 'Profile'}
               </span>
             </div>
           </div>
@@ -434,10 +434,10 @@ export default function Home() {
                   <span className="font-display font-bold text-xs uppercase tracking-wider">No Live Matches Right Now</span>
                 </div>
                 <h3 className="font-display font-extrabold text-base text-white">
-                  Stadium Arena is Currently Open
+                  Ready to Start a Game
                 </h3>
                 <p className="text-xs text-[#86948A] mt-1 max-w-xs mx-auto">
-                  Public auction rooms will appear here dynamically as soon as a live auction commences.
+                  Public auction rooms will appear here when a game begins.
                 </p>
                 <div className="mt-4 flex justify-center gap-3">
                   <GameButton
@@ -445,7 +445,7 @@ export default function Home() {
                     variant="primary"
                     size="sm"
                   >
-                    HOST LIVE ARENA
+                    HOST GAME
                   </GameButton>
                   <GameButton
                     onClick={() => navigate('/join')}
@@ -473,7 +473,7 @@ export default function Home() {
               {roomsLoading && publicLiveRooms.length === 0 ? (
                 <div className="p-8 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
                   <RefreshCw size={20} className="animate-spin text-[#10B981] mx-auto mb-2" />
-                  <span className="text-xs text-[#86948A] font-mono">Syncing active tournament rooms...</span>
+                  <span className="text-xs text-[#86948A] font-mono">Syncing active rooms...</span>
                 </div>
               ) : publicLiveRooms.length === 0 ? (
                 <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
@@ -669,7 +669,7 @@ export default function Home() {
                   matchesFilter === 'brackets' ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
                 }`}
               >
-                Tournament Brackets
+                Game Brackets
               </button>
               <button 
                 onClick={() => navigate('/create')} 
@@ -679,7 +679,7 @@ export default function Home() {
               </button>
             </div>
 
-            {/* TAB: LIVE ARENAS */}
+            {/* TAB: LIVE ROOMS */}
             {matchesFilter === 'live' && (
               <div className="space-y-2.5">
                 {publicLiveRooms.length === 0 ? (
@@ -690,7 +690,7 @@ export default function Home() {
                       variant="primary"
                       size="sm"
                     >
-                      CREATE NEW ARENA
+                      CREATE NEW ROOM
                     </GameButton>
                   </div>
                 ) : (
@@ -815,7 +815,7 @@ export default function Home() {
                 <GavelIcon size={20} color="#10B981" />
               </div>
               <div>
-                <b className="font-bold text-sm font-display text-[#DFE2EF] block">Host Tournament Room</b>
+                <b className="font-bold text-sm font-display text-[#DFE2EF] block">Host Room</b>
                 <small className="text-xs text-[#86948A] block mt-0.5">Configure franchise slots, purse, timers & AI bots.</small>
               </div>
               <ChevronRight size={18} className="ml-auto text-[#10B981]" />
@@ -830,7 +830,7 @@ export default function Home() {
               </div>
               <div>
                 <b className="font-bold text-sm font-display text-[#DFE2EF] block">Join With Invite Code</b>
-                <small className="text-xs text-[#86948A] block mt-0.5">Enter a 6-character room code to join an active arena.</small>
+                <small className="text-xs text-[#86948A] block mt-0.5">Enter a 6-character room code to join a game.</small>
               </div>
               <ChevronRight size={18} className="ml-auto text-[#06B6D4]" />
             </div>

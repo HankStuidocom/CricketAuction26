@@ -298,7 +298,7 @@ export default function LiveAuction() {
             <span className={`w-2.5 h-2.5 rounded-full ${isSpectator ? 'bg-[#06B6D4]' : 'bg-[#10B981]'} animate-ping`}></span>
             <div>
               <div className="text-[10px] font-bold text-[#86948A] uppercase tracking-wider font-mono flex items-center gap-2">
-                <span>ARENA #{code}</span>
+                <span>ROOM #{code}</span>
                 {isSpectator && (
                   <span className="px-1.5 py-0.5 rounded-[2px] bg-[#06B6D4]/20 text-[#06B6D4] text-[10px] font-bold font-mono tracking-wider">
                     SPECTATOR
@@ -473,7 +473,7 @@ export default function LiveAuction() {
                 {bidDisabledReason}
               </span>
               <span className="text-[10px] text-[#86948A] font-mono mt-0.5 block">
-                Tournament rules require squad reserve & overseas limits
+                Rules require squad reserve & overseas limits
               </span>
             </div>
           ) : (
@@ -643,7 +643,7 @@ export default function LiveAuction() {
                 activeTab === 'chat' ? 'border-[#10B981] text-[#10B981]' : 'border-transparent text-[#86948A]'
               }`}
             >
-              Arena Comms
+              Room Chat
             </button>
             {(isHost || isManager) && (
               <button
@@ -860,7 +860,7 @@ export default function LiveAuction() {
             onClick={() => navigate('/')} 
             className="hover:text-[#DFE2EF] flex items-center gap-1.5 transition text-xs font-mono font-bold"
           >
-            <LogOut size={13} /> Exit Arena
+            <LogOut size={13} /> Exit Room
           </button>
         </div>
       </div>
