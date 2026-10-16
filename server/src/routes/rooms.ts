@@ -134,12 +134,26 @@ router.get('/my/private', (req, res) => {
 router.post('/', (req, res) => {
   const { roomConfig, hostFranchise, hostDisplayName, hostId } = req.body;
   try {
+    let effectiveHostId = (hostId || '').trim();
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET) as any;
+        if (decoded && decoded.id) {
+          effectiveHostId = decoded.id;
+        }
+      } catch {}
+    }
+    if (!effectiveHostId) {
+      effectiveHostId = 'guest-' + Math.random().toString(36).substring(2, 10);
+    }
+
     const idempotencyKey = (req.body.idempotency_key || req.body.idempotencyKey || '').trim();
     if (idempotencyKey) {
       const existing = db.prepare('SELECT * FROM rooms WHERE idempotency_key = ?').get(idempotencyKey) as any;
       if (existing) {
         const hostToken = jwt.sign(
-          { hostId: existing.host_id || 'guest-host', roomId: existing.id, roomCode: existing.room_code, isHost: true },
+          { hostId: existing.host_id || effectiveHostId, roomId: existing.id, roomCode: existing.room_code, isHost: true },
           JWT_SECRET,
           { expiresIn: '7d' }
         );
@@ -171,7 +185,7 @@ router.post('/', (req, res) => {
       roomId, 
       roomCode, 
       (roomConfig && roomConfig.name) ? roomConfig.name : `Room ${roomCode}`, 
-      hostId || 'guest-host', 
+      effectiveHostId, 
       hostFranchise || 'CSK',
       roomConfig?.isPrivate ? 1 : 0,
       passwordHash,
@@ -196,7 +210,7 @@ router.post('/', (req, res) => {
       db.prepare(`
         INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, joined_at)
         VALUES (?, ?, ?, ?, ?, ?, 1, ?)
-      `).run(crypto.randomUUID(), roomId, hostId || 'guest-host', hostFranchise || 'CSK', hostDisplayName || 'Host', (roomConfig && roomConfig.startingPurse) || 12000, Date.now());
+      `).run(crypto.randomUUID(), roomId, effectiveHostId, hostFranchise || 'CSK', hostDisplayName || 'Host', (roomConfig && roomConfig.startingPurse) || 12000, Date.now());
     }
 
     // Initialize auction queue with pool size support (Blitz: 40, Standard: 80, Mega: 250, or custom)
@@ -221,7 +235,7 @@ router.post('/', (req, res) => {
 
     // Secure cryptographically-signed host token for the room creator
     const hostToken = jwt.sign(
-      { hostId: hostId || 'guest-host', roomId, roomCode, isHost: true },
+      { hostId: effectiveHostId, roomId, roomCode, isHost: true },
       JWT_SECRET,
       { expiresIn: '7d' }
     );

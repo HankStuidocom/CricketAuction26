@@ -141,18 +141,39 @@ function scheduleAIBidding(io: Server, roomCode: string) {
   }, delay);
 }
 
-function checkHostAuthority(room: any, socket: Socket): boolean {
-  const callerUserId = socket.data.userId;
-  if (!callerUserId) return false;
-  const isRegisteredHost = Boolean(db.prepare('SELECT id FROM users WHERE id = ?').get(room.host_id));
-  if (isRegisteredHost) {
-    return socket.data.authUserId === room.host_id;
+function checkHostAuthority(room: any, socket: Socket, dataToken?: string): boolean {
+  if (socket.data.isHost) return true;
+
+  const callerUserId = socket.data.userId || socket.data.authUserId;
+  if (socket.data.authUserId && socket.data.authUserId === room.host_id) {
+    socket.data.isHost = true;
+    return true;
   }
-  if (room.host_id === callerUserId) {
-    return Boolean(socket.data.isHost);
+  if (callerUserId && room.host_id === callerUserId) {
+    socket.data.isHost = true;
+    return true;
   }
-  const hostParticipant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, callerUserId) as any;
-  return Boolean(hostParticipant && hostParticipant.is_host && socket.data.isHost);
+  if (callerUserId) {
+    const hostParticipant = db.prepare('SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?').get(room.id, callerUserId) as any;
+    if (hostParticipant && hostParticipant.is_host) {
+      socket.data.isHost = true;
+      return true;
+    }
+  }
+
+  // Check token passed in data or in socket handshake auth
+  const tokenToVerify = dataToken || socket.handshake.auth?.hostToken;
+  if (tokenToVerify) {
+    try {
+      const decoded = jwt.verify(tokenToVerify, JWT_SECRET) as any;
+      if (decoded && decoded.isHost && (decoded.roomCode === room.room_code || decoded.roomId === room.id)) {
+        socket.data.isHost = true;
+        return true;
+      }
+    } catch {}
+  }
+
+  return false;
 }
 
 export function setupSocketHandlers(io: Server) {
@@ -227,32 +248,27 @@ export function setupSocketHandlers(io: Server) {
         'SELECT * FROM room_participants WHERE room_id = ? AND user_id = ?'
       ).get(room.id, effectiveUserId) as unknown as RoomParticipant | undefined;
 
-      let isHostUser = room.host_id === effectiveUserId;
-      if (isHostUser) {
-        if (isRegisteredHost) {
-          if (socket.data.authUserId !== room.host_id) {
-            isHostUser = false;
+      let isHostUser = false;
+      const providedToken = hostToken || socket.handshake.auth?.hostToken;
+      if (providedToken) {
+        try {
+          const decoded = jwt.verify(providedToken, JWT_SECRET) as any;
+          if (decoded && decoded.isHost && (decoded.roomCode === normalizedCode || decoded.roomId === room.id)) {
+            isHostUser = true;
           }
-        } else {
-          const providedToken = hostToken || socket.handshake.auth?.hostToken;
-          let validHostToken = false;
-          if (providedToken) {
-            try {
-              const decoded = jwt.verify(providedToken, JWT_SECRET) as any;
-              if (decoded && decoded.isHost && (decoded.roomCode === normalizedCode || decoded.roomId === room.id)) {
-                validHostToken = true;
-              }
-            } catch {
-              validHostToken = false;
-            }
-          } else if (room.host_id === effectiveUserId) {
-            validHostToken = true;
-          }
-          if (!validHostToken) {
-            isHostUser = false;
-          }
+        } catch {}
+      }
+
+      if (!isHostUser) {
+        if (socket.data.authUserId && socket.data.authUserId === room.host_id) {
+          isHostUser = true;
+        } else if (effectiveUserId && room.host_id === effectiveUserId) {
+          isHostUser = true;
+        } else if (existingUserSlot && existingUserSlot.is_host) {
+          isHostUser = true;
         }
       }
+
       if (isHostUser) {
         socket.data.isHost = true;
       }
@@ -265,10 +281,11 @@ export function setupSocketHandlers(io: Server) {
           roomCode: normalizedCode,
           franchise: 'ADMIN',
           participant: null,
+          isHost: true,
           isManager: true,
           room
         });
-        socket.emit('room_joined', { room, participant: null, isManager: true });
+        socket.emit('room_joined', { room, participant: null, isHost: true, isManager: true });
         emitRoomState(io, normalizedCode);
         return;
       }
@@ -276,15 +293,17 @@ export function setupSocketHandlers(io: Server) {
       // RECONNECT CASE B: Existing franchise owner reconnecting after refresh or disconnect
       if (existingUserSlot) {
         socket.join(normalizedCode);
+        const userIsHost = Boolean(isHostUser || existingUserSlot.is_host);
         socket.emit('join_handshake_success', {
           role: 'RECONNECT',
           roomCode: normalizedCode,
           franchise: existingUserSlot.franchise_id,
           participant: existingUserSlot,
+          isHost: userIsHost,
           isManager: false,
           room
         });
-        socket.emit('room_joined', { room, participant: existingUserSlot });
+        socket.emit('room_joined', { room, participant: existingUserSlot, isHost: userIsHost });
         emitRoomState(io, normalizedCode);
         return;
       }
@@ -427,9 +446,10 @@ export function setupSocketHandlers(io: Server) {
         roomCode: normalizedCode,
         franchise: assignedFranchise,
         participant,
+        isHost: Boolean(isHostUser),
         room
       });
-      socket.emit('room_joined', { room, participant });
+      socket.emit('room_joined', { room, participant, isHost: Boolean(isHostUser) });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('participant_joined', { participant });
       io.emit('rooms_updated', { roomCode: normalizedCode });
@@ -460,17 +480,22 @@ export function setupSocketHandlers(io: Server) {
         return socket.emit('error', { message: 'Auction can only be started from the lobby' });
       }
 
-      if (!checkHostAuthority(room, socket)) {
+      if (!checkHostAuthority(room, socket, data?.hostToken)) {
         return socket.emit('error', { message: 'Only host or commissioner can start the auction' });
       }
 
-      // Initialize AI teams if enabled
-      if (room.ai_enabled) {
+      // Check participant count: need at least 2 teams (human or AI) to conduct an auction.
+      // If only 1 team is present, automatically enable AI and fill bots so solo host can start immediately!
+      const currentParticipants = db.prepare('SELECT COUNT(*) as count FROM room_participants WHERE room_id = ?').get(room.id) as { count: number };
+      const participantCount = currentParticipants?.count || 0;
+
+      if (participantCount < 2 || room.ai_enabled) {
+        db.prepare('UPDATE rooms SET ai_enabled = 1 WHERE id = ?').run(room.id);
         initializeAITeams(room.id, normalizedCode, {
-          ai_enabled: room.ai_enabled === 1,
-          ai_difficulty: room.ai_difficulty,
-          max_teams: room.max_teams,
-          starting_purse_lakhs: room.starting_purse_lakhs
+          ai_enabled: true,
+          ai_difficulty: room.ai_difficulty || 'MEDIUM',
+          max_teams: room.max_teams || 10,
+          starting_purse_lakhs: room.starting_purse_lakhs || 12000
         });
       }
 
@@ -764,7 +789,7 @@ export function setupSocketHandlers(io: Server) {
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as unknown as Room | undefined;
       if (!room) return;
-      if (!checkHostAuthority(room, socket)) {
+      if (!checkHostAuthority(room, socket, data?.hostToken)) {
         return socket.emit('error', { message: 'Only the host or Game Manager can close this room' });
       }
       if (room.status !== 'LOBBY') {
@@ -903,7 +928,7 @@ export function setupSocketHandlers(io: Server) {
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as any;
       if (!room) return socket.emit('error', { message: 'Room not found' });
-      if (!checkHostAuthority(room, socket)) {
+      if (!checkHostAuthority(room, socket, data?.hostToken)) {
         return socket.emit('error', { message: 'Only host or commissioner can fill AI bots' });
       }
       if (room.status !== 'LOBBY') {
@@ -914,14 +939,25 @@ export function setupSocketHandlers(io: Server) {
       const participants = db.prepare('SELECT * FROM room_participants WHERE room_id = ?').all(room.id) as any[];
       const takenFranchises = new Set(participants.map((p: any) => p.franchise_id));
 
+      const difficulty = room.ai_difficulty || 'MEDIUM';
+      const names = ['Strategic Bot', 'Analytics Bot', 'Value Bot', 'Aggressive Bot', 'Patient Bot', 'Balanced Bot'];
       let filled = 0;
       for (const fId of allFranchises) {
         if (participants.length + filled >= (room.max_teams || 10)) break;
         if (!takenFranchises.has(fId)) {
           db.prepare(`
             INSERT INTO room_participants (id, room_id, user_id, franchise_id, display_name, purse_remaining_lakhs, is_host, is_ai, ai_difficulty, joined_at)
-            VALUES (?, ?, NULL, ?, ?, ?, 0, 1, 'MEDIUM', ?)
-          `).run(crypto.randomUUID(), room.id, fId, `${fId} Bot`, room.starting_purse_lakhs, Date.now());
+            VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
+          `).run(
+            crypto.randomUUID(),
+            room.id,
+            `ai-${fId.toLowerCase()}`,
+            fId,
+            `${names[filled % names.length]} (${fId})`,
+            room.starting_purse_lakhs || 12000,
+            difficulty,
+            Date.now()
+          );
           filled++;
         }
       }
@@ -939,7 +975,7 @@ export function setupSocketHandlers(io: Server) {
       const normalizedCode = (roomCode || '').trim().toUpperCase();
       const room = db.prepare('SELECT * FROM rooms WHERE UPPER(room_code) = ?').get(normalizedCode) as any;
       if (!room) return socket.emit('error', { message: 'Room not found' });
-      if (!checkHostAuthority(room, socket)) {
+      if (!checkHostAuthority(room, socket, data?.hostToken)) {
         return socket.emit('error', { message: 'Only host or commissioner can clear AI bots' });
       }
       if (room.status !== 'LOBBY') {

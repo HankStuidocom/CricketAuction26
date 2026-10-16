@@ -90,18 +90,19 @@ export default function CreateAuction() {
       });
 
       if (data.hostToken) {
-        localStorage.setItem(`ca26_host_token_${data.roomCode}`, data.hostToken);
+        localStorage.setItem(`ca26_host_token_${data.roomCode.toUpperCase()}`, data.hostToken);
       }
       
       saveRoomSession(data.roomCode, {
         franchise: selectedFranchise,
         displayName,
         userId: hostId,
+        hostToken: data.hostToken,
         password: isPrivate ? password : undefined
-      });
+      } as any);
 
       navigate(`/room/${data.roomCode}`, {
-        state: { displayName, franchise: selectedFranchise, userId: hostId }
+        state: { displayName, franchise: selectedFranchise, userId: hostId, hostToken: data.hostToken }
       });
     } catch (err: any) {
       setError(err.message);

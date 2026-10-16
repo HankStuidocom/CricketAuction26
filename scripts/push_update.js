@@ -23,7 +23,7 @@ async function syncAndPush() {
     console.log('Working tree is clean. Checking if unpushed commits exist...');
   } else {
     console.log('[2/4] Committing changes...');
-    const commitMsg = 'feat: implement room cancellation and inactive-room cleanup with host controls, idle auto-expiry, and 30-day purge';
+    const commitMsg = 'fix: resolve host authority verification, enable fill with bots, and support solo host auto-fill start';
     const sha = await git.commit({
       fs,
       dir,

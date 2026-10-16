@@ -38,6 +38,7 @@ export default function Lobby() {
   const [showCloseRoomModal, setShowCloseRoomModal] = useState(false);
   const [closeRoomError, setCloseRoomError] = useState<string | null>(null);
   const [idleWarning, setIdleWarning] = useState<string | null>(null);
+  const [serverIsHost, setServerIsHost] = useState(false);
 
   const savedSession = getRoomSession(code || '');
   const passedFranchise = location.state?.franchise || savedSession.franchise || '';
@@ -90,6 +91,7 @@ export default function Lobby() {
 
     s.on('join_handshake_success', (data) => {
       if (data.room) setRoom(data.room);
+      if (data.isHost) setServerIsHost(true);
       let franchise = myFranchise;
       if (data.role === 'COMMISSIONER') {
         franchise = 'ADMIN';
@@ -157,6 +159,9 @@ export default function Lobby() {
 
     s.on('room_joined', (data) => {
       if (data.room) setRoom(data.room);
+      if (data.isHost || data.participant?.is_host || (data.room && myUserId && data.room.host_id === myUserId)) {
+        setServerIsHost(true);
+      }
       // Confirm our actual franchise from server
       if (data.participant?.franchise_id) setMyFranchise(data.participant.franchise_id);
       fetchRoomDetails();
@@ -164,9 +169,13 @@ export default function Lobby() {
 
     s.on('room_state', (state) => {
       setRoom(state);
+      if (state && myUserId && state.host_id === myUserId) {
+        setServerIsHost(true);
+      }
       // Keep our franchise in sync if someone else took ours
       const mySlot = state.participants?.find((p: any) => p.user_id === myUserId);
       if (mySlot?.franchise_id) setMyFranchise(mySlot.franchise_id);
+      if (mySlot?.is_host) setServerIsHost(true);
 
       if (state.status === 'COMPLETED') {
         navigate(`/room/${code}/results`);
@@ -286,8 +295,8 @@ export default function Lobby() {
   };
 
   const startAuction = () => {
-    if (socket && code && myUserId) {
-      socket.emit('start_auction', { roomCode: code, userId: myUserId });
+    if (socket && code) {
+      socket.emit('start_auction', { roomCode: code, userId: myUserId, hostToken: passedHostToken });
     }
   };
 
@@ -323,7 +332,12 @@ export default function Lobby() {
     }
   };
 
-  const isHost = room?.host_id === myUserId;
+  const isHost = Boolean(
+    serverIsHost ||
+    (room && myUserId && room.host_id === myUserId) ||
+    room?.participants?.some((p: any) => p.user_id === myUserId && p.is_host) ||
+    Boolean(passedHostToken)
+  );
   const isLobby = room?.status === 'LOBBY';
   const participantCount = room?.participants?.length || 0;
   const aiCount = room?.participants?.filter((p: any) => p.is_ai).length || 0;
@@ -357,19 +371,19 @@ export default function Lobby() {
 
   const fillWithBots = () => {
     if (socket && code) {
-      socket.emit('host_fill_ai', { roomCode: code });
+      socket.emit('host_fill_ai', { roomCode: code, hostToken: passedHostToken });
     }
   };
 
   const clearBots = () => {
     if (socket && code) {
-      socket.emit('host_clear_ai', { roomCode: code });
+      socket.emit('host_clear_ai', { roomCode: code, hostToken: passedHostToken });
     }
   };
 
   const confirmCloseRoom = () => {
     if (socket && code) {
-      socket.emit('host_cancel_room', { roomCode: code });
+      socket.emit('host_cancel_room', { roomCode: code, hostToken: passedHostToken });
       setShowCloseRoomModal(false);
     }
   };
@@ -714,7 +728,7 @@ export default function Lobby() {
       {isHost && (
         <div className="mt-4 pt-3 border-t border-[#1F2937] flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-[#86948A]">
-            {participantCount < 2 ? '⚠ Need at least 2 teams to start' : `${participantCount} teams ready — good to go!`}
+            {participantCount < 2 ? 'ℹ Solo host mode: Click "Fill with Bots" or start immediately with AI bots' : `${participantCount} teams ready — good to go!`}
           </p>
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap justify-end">
             {isLobby && (
@@ -754,11 +768,10 @@ export default function Lobby() {
               onClick={startAuction}
               variant="primary"
               size="lg"
-              disabled={participantCount < 2}
               className="w-full sm:w-auto px-8"
               icon={<PlayArrowIcon size={18} color="#090D16" />}
             >
-              START AUCTION
+              {participantCount < 2 ? 'START AUCTION (WITH BOTS)' : 'START AUCTION'}
             </GameButton>
           </div>
         </div>
