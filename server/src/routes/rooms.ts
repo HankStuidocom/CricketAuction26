@@ -10,6 +10,62 @@ import { Room } from '../types';
 
 const router = Router();
 
+function enrichRoom(room: any) {
+  // 1. Participant count & details
+  const participants = db.prepare('SELECT * FROM room_participants WHERE room_id = ?').all(room.id) as any[];
+  const teamsCount = participants.length;
+
+  // 2. Host info & purse
+  const host = db.prepare('SELECT * FROM users WHERE id = ?').get(room.host_id) as any;
+  const hostParticipant = participants.find((p: any) => p.is_host === 1 || p.user_id === room.host_id);
+  const remainingPurseLakhs = hostParticipant ? hostParticipant.purse_remaining_lakhs : room.starting_purse_lakhs;
+
+  // 3. Highest bid in auction
+  const maxBidRecord = db.prepare('SELECT MAX(amount_lakhs) as max_bid FROM bids WHERE room_id = ?').get(room.id) as any;
+  const highestBidLakhs = Math.max(room.current_bid_lakhs || 0, maxBidRecord?.max_bid || 0);
+
+  // 4. Team points & Leaderboard
+  const teamStats = participants.map((p: any) => {
+    const pointsRow = db.prepare(`
+      SELECT COALESCE(SUM(pl.game_points), 0) as pts
+      FROM squad_players sp
+      JOIN players pl ON pl.id = sp.player_id
+      WHERE sp.room_id = ? AND sp.franchise_id = ?
+    `).get(room.id, p.franchise_id) as any;
+    return {
+      franchise_id: p.franchise_id,
+      display_name: p.display_name,
+      points: pointsRow?.pts || 0,
+      purse_remaining_lakhs: p.purse_remaining_lakhs
+    };
+  });
+
+  // Sort by points descending
+  teamStats.sort((a: any, b: any) => b.points - a.points);
+  const leadingTeam = teamStats[0] || { franchise_id: room.host_franchise || 'CSK', points: 0 };
+  const runnerUpTeam = teamStats[1] || (teamStats.length > 0 ? null : { franchise_id: 'GT', points: 0 });
+
+  const sanitizedRoom: any = { ...room };
+  delete sanitizedRoom.password_hash;
+  sanitizedRoom.has_password = Boolean(room.password_hash);
+  sanitizedRoom.is_private = Boolean(room.is_private);
+
+  return {
+    ...sanitizedRoom,
+    teams_count: teamsCount,
+    host_user: host ? {
+      username: host.username,
+      display_name: host.display_name,
+      avatar_emoji: host.avatar_emoji
+    } : null,
+    host_purse_lakhs: remainingPurseLakhs,
+    highest_bid_lakhs: highestBidLakhs,
+    leading_team: leadingTeam,
+    runner_up_team: runnerUpTeam,
+    team_leaderboard: teamStats
+  };
+}
+
 // List public rooms (with optional live filter and full leaderboard/purse enrichment)
 router.get('/', (req, res) => {
   try {
@@ -21,64 +77,35 @@ router.get('/', (req, res) => {
     query += ' ORDER BY created_at DESC LIMIT 50';
     const rooms = db.prepare(query).all() as any[];
 
-    const enrichedRooms = rooms.map(room => {
-      // 1. Participant count & details
-      const participants = db.prepare('SELECT * FROM room_participants WHERE room_id = ?').all(room.id) as any[];
-      const teamsCount = participants.length;
-
-      // 2. Host info & purse
-      const host = db.prepare('SELECT * FROM users WHERE id = ?').get(room.host_id) as any;
-      const hostParticipant = participants.find((p: any) => p.is_host === 1 || p.user_id === room.host_id);
-      const remainingPurseLakhs = hostParticipant ? hostParticipant.purse_remaining_lakhs : room.starting_purse_lakhs;
-
-      // 3. Highest bid in auction
-      const maxBidRecord = db.prepare('SELECT MAX(amount_lakhs) as max_bid FROM bids WHERE room_id = ?').get(room.id) as any;
-      const highestBidLakhs = Math.max(room.current_bid_lakhs || 0, maxBidRecord?.max_bid || 0);
-
-      // 4. Team points & Leaderboard
-      const teamStats = participants.map((p: any) => {
-        const pointsRow = db.prepare(`
-          SELECT COALESCE(SUM(pl.game_points), 0) as pts
-          FROM squad_players sp
-          JOIN players pl ON pl.id = sp.player_id
-          WHERE sp.room_id = ? AND sp.franchise_id = ?
-        `).get(room.id, p.franchise_id) as any;
-        return {
-          franchise_id: p.franchise_id,
-          display_name: p.display_name,
-          points: pointsRow?.pts || 0,
-          purse_remaining_lakhs: p.purse_remaining_lakhs
-        };
-      });
-
-      // Sort by points descending
-      teamStats.sort((a: any, b: any) => b.points - a.points);
-      const leadingTeam = teamStats[0] || { franchise_id: room.host_franchise || 'CSK', points: 0 };
-      const runnerUpTeam = teamStats[1] || (teamStats.length > 0 ? null : { franchise_id: 'GT', points: 0 });
-
-      const sanitizedRoom: any = { ...room };
-      delete sanitizedRoom.password_hash;
-      sanitizedRoom.has_password = Boolean(room.password_hash);
-
-      return {
-        ...sanitizedRoom,
-        teams_count: teamsCount,
-        host_user: host ? {
-          username: host.username,
-          display_name: host.display_name,
-          avatar_emoji: host.avatar_emoji
-        } : null,
-        host_purse_lakhs: remainingPurseLakhs,
-        highest_bid_lakhs: highestBidLakhs,
-        leading_team: leadingTeam,
-        runner_up_team: runnerUpTeam,
-        team_leaderboard: teamStats
-      };
-    });
-
+    const enrichedRooms = rooms.map(enrichRoom);
     res.json(enrichedRooms);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// List signed-in player's private rooms (hosted, joined, or invited)
+router.get('/my/private', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as any;
+    const userId = payload.id || payload.hostId;
+    if (!userId) return res.status(401).json({ error: 'Invalid token' });
+
+    const rooms = db.prepare(`
+      SELECT DISTINCT r.* FROM rooms r
+      LEFT JOIN room_participants rp ON rp.room_id = r.id AND rp.user_id = ?
+      LEFT JOIN room_invites ri ON ri.room_id = r.id AND ri.receiver_id = ?
+      WHERE r.is_private = 1 AND (r.host_id = ? OR rp.user_id IS NOT NULL OR ri.receiver_id IS NOT NULL)
+      ORDER BY r.created_at DESC LIMIT 50
+    `).all(userId, userId, userId) as any[];
+
+    const enriched = rooms.map(enrichRoom);
+    res.json(enriched);
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 });
 
@@ -86,6 +113,19 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   const { roomConfig, hostFranchise, hostDisplayName, hostId } = req.body;
   try {
+    const idempotencyKey = (req.body.idempotency_key || req.body.idempotencyKey || '').trim();
+    if (idempotencyKey) {
+      const existing = db.prepare('SELECT * FROM rooms WHERE idempotency_key = ?').get(idempotencyKey) as any;
+      if (existing) {
+        const hostToken = jwt.sign(
+          { hostId: existing.host_id || 'guest-host', roomId: existing.id, roomCode: existing.room_code, isHost: true },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        return res.json({ success: true, roomCode: existing.room_code, roomId: existing.id, hostToken, deduplicated: true });
+      }
+    }
+
     const isGameManager = hostFranchise === 'ADMIN';
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     const roomId = crypto.randomUUID();
@@ -104,8 +144,8 @@ router.post('/', (req, res) => {
         id, room_code, room_name, host_id, host_franchise,
         is_private, password_hash,
         max_teams, max_squad_size, min_squad_size, starting_purse_lakhs, bid_timer_seconds,
-        is_unlimited_timer, ai_enabled, ai_difficulty, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_unlimited_timer, ai_enabled, ai_difficulty, idempotency_key, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       roomId, 
       roomCode, 
@@ -122,6 +162,7 @@ router.post('/', (req, res) => {
       roomConfig?.isUnlimited ? 1 : 0,
       roomConfig?.aiEnabled ? 1 : 0,
       roomConfig?.aiDifficulty || 'MEDIUM',
+      idempotencyKey || null,
       Date.now()
     );
 

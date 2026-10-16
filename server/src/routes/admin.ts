@@ -3,9 +3,9 @@ import jwt from 'jsonwebtoken';
 import db from '../database/db';
 import { importPlayersFromExcel } from '../services/importPlayers';
 
+import { JWT_SECRET, ADMIN_KEY } from '../config';
+
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret2026';
-const ADMIN_KEY = process.env.ADMIN_KEY;
 
 // Middleware to guard mutation routes against unauthorized access
 function requireAdminAuth(req: any, res: any, next: any) {

@@ -58,8 +58,10 @@ export default function CreateAuction() {
     setError('');
 
     const hostId = getOrCreateUserId();
+    const idempotencyKey = crypto.randomUUID();
 
     const payload = {
+      idempotencyKey,
       hostId,
       hostFranchise: selectedFranchise,
       hostDisplayName: displayName,

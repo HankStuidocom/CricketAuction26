@@ -1,7 +1,8 @@
 import { Server, Socket } from 'socket.io';
 import db from '../database/db';
-import { processBid, finalizeCurrent, advanceToNextPlayer, getNextValidBid, relistCurrent, relistUnsoldPlayer, deferCurrentPlayer } from '../services/auctionEngine';
+import { processBid, finalizeCurrent, advanceToNextPlayer, getNextValidBid, relistCurrent, relistUnsoldPlayer, deferCurrentPlayer, recordAuctionCompletion } from '../services/auctionEngine';
 import { processAIBids, initializeAITeams } from '../services/aiBidding';
+import { setPresenceIo, registerUserSocket, removeSocketId } from '../services/presence';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -152,6 +153,8 @@ function checkHostAuthority(room: any, socket: Socket): boolean {
 }
 
 export function setupSocketHandlers(io: Server) {
+  setPresenceIo(io);
+
   io.on('connection', (socket: Socket) => {
     // Authenticate token if present
     const handshakeToken = (socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', ''));
@@ -160,6 +163,9 @@ export function setupSocketHandlers(io: Server) {
         const decoded = jwt.verify(handshakeToken, JWT_SECRET) as any;
         socket.data.authUserId = decoded.id;
         socket.data.authUsername = decoded.username;
+        if (decoded.id) {
+          registerUserSocket(decoded.id, socket.id);
+        }
       } catch {}
     }
     
@@ -199,6 +205,9 @@ export function setupSocketHandlers(io: Server) {
 
       socket.data.userId = effectiveUserId;
       socket.data.roomCode = normalizedCode;
+      if (effectiveUserId) {
+        registerUserSocket(effectiveUserId, socket.id);
+      }
 
       // 3. Reconnect check: Is this user ALREADY a registered participant in this room?
       const existingUserSlot = db.prepare(
@@ -708,6 +717,7 @@ export function setupSocketHandlers(io: Server) {
 
       db.prepare('UPDATE rooms SET status = "COMPLETED", bid_deadline = NULL, current_player_id = NULL, current_bid_lakhs = 0, current_bidder_franchise = NULL, completed_at = ? WHERE id = ?')
         .run(Date.now(), room.id);
+      recordAuctionCompletion(room.id);
       logEvent(room.id, 'auction_ended_by_host', { by: socket.data.userId, resolution: activeCardResolution });
       emitRoomState(io, normalizedCode);
       io.to(normalizedCode).emit('auction_completed', { message: 'Auction concluded by Commissioner' });
@@ -828,7 +838,7 @@ export function setupSocketHandlers(io: Server) {
     });
 
     socket.on('disconnect', () => {
-      // Cleaned up by socket.io
+      removeSocketId(socket.id);
     });
   });
 

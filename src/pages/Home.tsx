@@ -32,7 +32,18 @@ import {
   LogOut,
   Eye,
   RefreshCw,
-  Trophy
+  Trophy,
+  Heart,
+  UserPlus,
+  Check,
+  X,
+  Trash2,
+  Send,
+  Lock,
+  Plus,
+  Sparkles,
+  Copy,
+  Award
 } from 'lucide-react';
 import { ServerHealthBadge } from '../components/ServerHealthBadge';
 
@@ -139,7 +150,25 @@ export default function Home() {
   const [profileSubtab, setProfileSubtab] = useState<'overview' | 'stats' | 'career'>('overview');
 
   // Matches tab filter
-  const [matchesFilter, setMatchesFilter] = useState<'live' | 'waiting' | 'brackets' | 'finished'>('live');
+  const [matchesFilter, setMatchesFilter] = useState<'public' | 'private'>('public');
+  const [privateRooms, setPrivateRooms] = useState<any[]>([]);
+  const [privateRoomsLoading, setPrivateRoomsLoading] = useState(false);
+  const [privateRoomCodeInput, setPrivateRoomCodeInput] = useState('');
+  const [privateRoomPasswordInput, setPrivateRoomPasswordInput] = useState('');
+
+  // Social / Friends state
+  const [friendsList, setFriendsList] = useState<any[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [friendsSearchQuery, setFriendsSearchQuery] = useState('');
+  const [friendsSearchResults, setFriendsSearchResults] = useState<any[]>([]);
+  const [friendsSearchLoading, setFriendsSearchLoading] = useState(false);
+  const [socialNotice, setSocialNotice] = useState('');
+
+  // Real Authenticated User Profile state
+  const [profileData, setProfileData] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [likeInProgress, setLikeInProgress] = useState(false);
 
   useEffect(() => {
     try {
@@ -162,6 +191,18 @@ export default function Home() {
     });
     socket.on('auction_completed', () => {
       fetchRooms();
+    });
+    socket.on('friend_request_received', () => {
+      fetchFriends();
+    });
+    socket.on('friend_request_accepted', () => {
+      fetchFriends();
+    });
+    socket.on('room_invitation_received', (data: any) => {
+      const accept = window.confirm(`🎮 ${data.senderDisplayName} invited you to join ${data.roomName} (#${data.roomCode})! Join now?`);
+      if (accept) {
+        navigate(`/room/${data.roomCode}`);
+      }
     });
 
     // Gentle polling interval while on Home tab
@@ -186,6 +227,148 @@ export default function Home() {
       setRoomsLoading(false);
     }
   };
+
+  const fetchPrivateRooms = async () => {
+    const token = localStorage.getItem('ca26_token');
+    if (!token) return;
+    setPrivateRoomsLoading(true);
+    try {
+      const data = await safeFetch<any[]>('/api/rooms/my/private');
+      setPrivateRooms(Array.isArray(data) ? data : []);
+    } catch {
+      // Retain existing state
+    } finally {
+      setPrivateRoomsLoading(false);
+    }
+  };
+
+  const fetchFriends = async () => {
+    const token = localStorage.getItem('ca26_token');
+    if (!token) return;
+    setFriendsLoading(true);
+    try {
+      const [friends, reqs] = await Promise.all([
+        safeFetch<any[]>('/api/friends'),
+        safeFetch<{ incoming: any[]; outgoing: any[] }>('/api/friends/requests')
+      ]);
+      setFriendsList(Array.isArray(friends) ? friends : []);
+      setIncomingRequests(Array.isArray(reqs?.incoming) ? reqs.incoming : []);
+    } catch {
+      // Retain existing state
+    } finally {
+      setFriendsLoading(false);
+    }
+  };
+
+  const searchFriends = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!friendsSearchQuery.trim() || friendsSearchQuery.trim().length < 2) return;
+    setFriendsSearchLoading(true);
+    try {
+      const results = await safeFetch<any[]>(`/api/friends/search?q=${encodeURIComponent(friendsSearchQuery.trim())}`);
+      setFriendsSearchResults(Array.isArray(results) ? results : []);
+    } catch (err: any) {
+      setSocialNotice(err.message || 'Search failed');
+    } finally {
+      setFriendsSearchLoading(false);
+    }
+  };
+
+  const handleSendFriendRequest = async (targetId: string) => {
+    try {
+      await safeFetch('/api/friends/request', {
+        method: 'POST',
+        body: JSON.stringify({ targetId })
+      });
+      setSocialNotice('Friend request sent!');
+      setTimeout(() => setSocialNotice(''), 3000);
+      searchFriends();
+    } catch (err: any) {
+      setSocialNotice(err.message || 'Could not send request');
+      setTimeout(() => setSocialNotice(''), 3000);
+    }
+  };
+
+  const handleRespondFriendRequest = async (requestId: string, action: 'accept' | 'reject') => {
+    try {
+      await safeFetch('/api/friends/respond', {
+        method: 'POST',
+        body: JSON.stringify({ requestId, action })
+      });
+      fetchFriends();
+      setSocialNotice(action === 'accept' ? 'Friend request accepted!' : 'Request declined');
+      setTimeout(() => setSocialNotice(''), 3000);
+    } catch (err: any) {
+      setSocialNotice(err.message || 'Action failed');
+      setTimeout(() => setSocialNotice(''), 3000);
+    }
+  };
+
+  const handleRemoveFriend = async (friendId: string) => {
+    try {
+      await safeFetch(`/api/friends/${friendId}`, { method: 'DELETE' });
+      fetchFriends();
+    } catch {}
+  };
+
+  const handleInviteToRoom = async (friendId: string) => {
+    const code = prompt('Enter 6-character Room Code to invite friend to:');
+    if (!code) return;
+    try {
+      await safeFetch('/api/friends/invite', {
+        method: 'POST',
+        body: JSON.stringify({ roomCode: code.trim().toUpperCase(), friendId })
+      });
+      alert('Invitation sent to player!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to send invite');
+    }
+  };
+
+  const fetchUserProfile = async () => {
+    if (!user?.id) return;
+    setProfileLoading(true);
+    try {
+      const data = await safeFetch<any>(`/api/users/${user.id}/profile`);
+      if (data && !data.error) {
+        setProfileData(data);
+      }
+    } catch {
+      // Retain existing state
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const handleToggleLike = async () => {
+    if (!user?.id || likeInProgress) return;
+    setLikeInProgress(true);
+    try {
+      const res = await safeFetch<{ success: boolean; liked: boolean; likes_count: number }>(`/api/users/${user.id}/like`, {
+        method: 'POST'
+      });
+      if (res && res.success) {
+        setProfileData((prev: any) => ({
+          ...prev,
+          likes_count: res.likes_count,
+          has_liked: res.liked
+        }));
+      }
+    } catch {
+    } finally {
+      setLikeInProgress(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'friends') {
+      fetchFriends();
+    } else if (activeTab === 'profile') {
+      fetchUserProfile();
+    } else if (activeTab === 'matches' && matchesFilter === 'private') {
+      fetchPrivateRooms();
+    }
+  }, [activeTab, matchesFilter, user?.id]);
 
   const handleStartFromSplash = () => {
     setSplashVisible(false);
@@ -285,9 +468,9 @@ export default function Home() {
               </span>
               <span className="text-[10px] font-bold font-mono tracking-wider text-[#10B981] uppercase block mt-0.5">
                 {activeTab === 'home' ? 'Live Match' : 
-                 activeTab === 'matches' ? 'Match Cards' :
+                 activeTab === 'matches' ? 'Matches' :
                  activeTab === 'play' ? 'Play' :
-                 activeTab === 'friends' ? 'Teams' : 'Profile'}
+                 activeTab === 'friends' ? 'Friends' : 'Profile'}
               </span>
             </div>
           </div>
@@ -642,159 +825,203 @@ export default function Home() {
         {/* ========================================================================= */}
         {/* TAB 2: MATCHES (Tournament Fixtures & Brackets)                           */}
         {/* ========================================================================= */}
+        {/* ========================================================================= */}
+        {/* TAB 2: MATCHES (Public Room & Private Room)                               */}
+        {/* ========================================================================= */}
         {activeTab === 'matches' && (
           <div className="space-y-4 animate-fade-up">
             
-            {/* Filter Pills */}
-            <div className="flex gap-2 mb-1 overflow-x-auto">
+            {/* Filter Pills: Public Room & Private Room */}
+            <div className="flex gap-2 mb-1 overflow-x-auto items-center">
               <button
-                onClick={() => setMatchesFilter('live')}
-                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap ${
-                  matchesFilter === 'live' ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
+                onClick={() => setMatchesFilter('public')}
+                className={`px-3.5 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap cursor-pointer ${
+                  matchesFilter === 'public' 
+                    ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+                    : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
                 }`}
               >
-                Live Match Cards ({publicLiveRooms.length})
+                Public Room ({publicRooms.length})
               </button>
               <button
-                onClick={() => setMatchesFilter('waiting')}
-                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap ${
-                  matchesFilter === 'waiting' ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
+                onClick={() => { setMatchesFilter('private'); fetchPrivateRooms(); }}
+                className={`px-3.5 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap cursor-pointer ${
+                  matchesFilter === 'private' 
+                    ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+                    : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
                 }`}
               >
-                Waiting Rooms ({publicWaitingRooms.length})
-              </button>
-              <button
-                onClick={() => setMatchesFilter('brackets')}
-                className={`px-3 py-1.5 rounded-[4px] text-xs font-bold font-display transition whitespace-nowrap ${
-                  matchesFilter === 'brackets' ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF]'
-                }`}
-              >
-                Game Brackets
+                Private Room ({privateRooms.length})
               </button>
               <button 
                 onClick={() => navigate('/create')} 
-                className="ml-auto text-xs bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 px-2.5 py-1.5 rounded-[4px] font-bold font-display hover:bg-[#10B981]/25 transition whitespace-nowrap"
+                className="ml-auto text-xs bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 px-3 py-1.5 rounded-[4px] font-bold font-display hover:bg-[#10B981]/25 transition whitespace-nowrap cursor-pointer"
               >
-                ＋ Host
+                ＋ Create Room
               </button>
             </div>
 
-            {/* TAB: LIVE ROOMS */}
-            {matchesFilter === 'live' && (
+            {/* TAB: PUBLIC ROOMS */}
+            {matchesFilter === 'public' && (
               <div className="space-y-2.5">
-                {publicLiveRooms.length === 0 ? (
+                {roomsLoading && publicRooms.length === 0 ? (
+                  <div className="p-8 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
+                    <RefreshCw size={20} className="animate-spin text-[#10B981] mx-auto mb-2" />
+                    <span className="text-xs text-[#86948A] font-mono">Syncing public rooms...</span>
+                  </div>
+                ) : publicRooms.length === 0 ? (
                   <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
-                    <p className="text-xs text-[#86948A] mb-3 font-mono">No active public live matches right now.</p>
+                    <p className="text-xs text-[#86948A] mb-3 font-mono">No public rooms active right now.</p>
                     <GameButton
                       onClick={() => navigate('/create')}
                       variant="primary"
                       size="sm"
                     >
-                      CREATE NEW ROOM
+                      CREATE ROOM
                     </GameButton>
                   </div>
                 ) : (
-                  publicLiveRooms.map((r: any) => (
-                    <div 
-                      key={r.room_code}
-                      className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-[6px] hover:border-[#10B981]/40 transition flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono font-bold text-[#10B981] text-xs">#{r.room_code}</span>
-                          <span className="text-[10px] text-[#10B981] font-mono font-bold">● LIVE</span>
+                  publicRooms.map((r: any) => {
+                    const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND'].includes(r.status);
+                    const isPaused = r.status === 'PAUSED';
+                    const isWaiting = r.status === 'LOBBY';
+                    const filledSlots = r.teams_count || 0;
+                    const maxSlots = r.max_teams || 10;
+                    const hasOpenSlot = filledSlots < maxSlots;
+
+                    return (
+                      <div 
+                        key={r.room_code}
+                        className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-[6px] hover:border-[#10B981]/40 transition flex items-center justify-between gap-3 shadow-sm"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono font-bold text-[#10B981] text-xs">#{r.room_code}</span>
+                            {isLive && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#EF4444]/20 text-[#EF4444] font-mono font-bold">● LIVE</span>}
+                            {isPaused && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B] font-mono font-bold">PAUSED</span>}
+                            {isWaiting && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#06B6D4]/20 text-[#06B6D4] font-mono font-bold">WAITING</span>}
+                          </div>
+                          <h4 className="font-display font-bold text-sm text-[#DFE2EF] truncate">{r.room_name}</h4>
+                          <span className="text-[11px] text-[#86948A] font-mono block mt-0.5">
+                            Slots: <b className="text-white">{filledSlots}/{maxSlots}</b> · Purse: <b className="text-[#10B981]">{formatCr(r.starting_purse_lakhs || 12000)}</b>
+                          </span>
                         </div>
-                        <h4 className="font-display font-bold text-sm text-[#DFE2EF]">{r.room_name}</h4>
-                        <span className="text-[11px] text-[#86948A] font-mono">Purse: {formatCr(r.starting_purse_lakhs || 12000)} · Max: {r.max_teams || 10}</span>
+                        <div className="flex gap-2 flex-shrink-0 items-center">
+                          {hasOpenSlot ? (
+                            <button
+                              onClick={() => navigate(`/room/${r.room_code}`)}
+                              className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer shadow"
+                            >
+                              Join Room
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => navigate(`/room/${r.room_code}/auction?spectate=true`, { state: { spectator: true } })}
+                              className="px-3.5 py-1.5 rounded-[4px] bg-[#0F131C] border border-[#10B981] text-[#10B981] hover:bg-[#10B981] hover:text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer"
+                            >
+                              Watch
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => navigate(`/room/${r.room_code}/auction?spectate=true`, { state: { spectator: true } })}
-                          className="px-3 py-1.5 rounded-[4px] bg-[#0F131C] border border-[#10B981] text-[#10B981] font-display font-bold text-xs uppercase"
-                        >
-                          Spec
-                        </button>
-                        <GameButton
-                          onClick={() => navigate(`/room/${r.room_code}`)}
-                          variant="primary"
-                          size="sm"
-                        >
-                          JOIN
-                        </GameButton>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
 
-            {/* TAB: WAITING ROOMS */}
-            {matchesFilter === 'waiting' && (
-              <div className="space-y-2.5">
-                {publicWaitingRooms.length === 0 ? (
-                  <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
-                    <p className="text-xs text-[#86948A] mb-3 font-mono">No public rooms currently waiting for players.</p>
-                    <GameButton
-                      onClick={() => navigate('/create')}
-                      variant="primary"
-                      size="sm"
-                    >
-                      CREATE NEW ROOM
-                    </GameButton>
+            {/* TAB: PRIVATE ROOMS */}
+            {matchesFilter === 'private' && (
+              <div className="space-y-3">
+                {/* Direct Room Code & Password Entry Box */}
+                <div className="p-4 bg-[#111827] border border-[#1F2937] rounded-[6px] space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Lock size={15} className="text-[#10B981]" />
+                    <span className="text-xs font-display font-bold uppercase tracking-wider text-white">Join Private Room</span>
                   </div>
-                ) : (
-                  publicWaitingRooms.map((r: any) => (
-                    <div 
-                      key={r.room_code}
-                      className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-[6px] hover:border-[#10B981]/40 transition flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono font-bold text-[#10B981] text-xs">#{r.room_code}</span>
-                          <span className="text-[10px] text-[#06B6D4] font-mono font-bold">● WAITING</span>
-                        </div>
-                        <h4 className="font-display font-bold text-sm text-[#DFE2EF]">{r.room_name}</h4>
-                        <span className="text-[11px] text-[#86948A] font-mono">Slots: {r.teams_count || 0}/{r.max_teams || 10} Filled · Purse: {formatCr(r.starting_purse_lakhs || 12000)}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <GameButton
-                          onClick={() => navigate(`/room/${r.room_code}`)}
-                          variant="primary"
-                          size="sm"
-                        >
-                          JOIN ROOM
-                        </GameButton>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-
-            {/* TAB: BRACKETS */}
-            {matchesFilter === 'brackets' && (
-              <div className="p-5 bg-[#111827] border border-[#1F2937] rounded-[6px] space-y-3">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#10B981]">
-                  SEASON PLAYOFF BRACKET
-                </span>
-                <div className="space-y-2">
-                  <div className="p-2.5 bg-[#0F131C] rounded-[4px] border border-[#1F2937] flex justify-between items-center text-xs">
-                    <span className="font-display font-bold">Qualifier 1: CSK vs MI</span>
-                    <span className="font-mono text-[#F59E0B]">Oct 24</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="Room Code (e.g. 6 CHARS)"
+                      value={privateRoomCodeInput}
+                      onChange={(e) => setPrivateRoomCodeInput(e.target.value.toUpperCase())}
+                      className="px-3 py-2 bg-[#0B1120] border border-[#1F2937] rounded-[4px] text-xs font-mono font-bold text-white uppercase focus:outline-none focus:border-[#10B981]"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Room Password (if set)"
+                      value={privateRoomPasswordInput}
+                      onChange={(e) => setPrivateRoomPasswordInput(e.target.value)}
+                      className="px-3 py-2 bg-[#0B1120] border border-[#1F2937] rounded-[4px] text-xs text-white focus:outline-none focus:border-[#10B981]"
+                    />
                   </div>
-                  <div className="p-2.5 bg-[#0F131C] rounded-[4px] border border-[#1F2937] flex justify-between items-center text-xs">
-                    <span className="font-display font-bold">Eliminator: RCB vs KKR</span>
-                    <span className="font-mono text-[#F59E0B]">Oct 25</span>
-                  </div>
-                  <div className="p-2.5 bg-[#0F131C] rounded-[4px] border border-[#1F2937] flex justify-between items-center text-xs">
-                    <span className="font-display font-bold">Qualifier 2: Winner Eliminator vs Q1 Runner</span>
-                    <span className="font-mono text-[#F59E0B]">Oct 27</span>
-                  </div>
-                  <div className="p-2.5 bg-[#0F131C] rounded-[4px] border border-[#10B981]/50 flex justify-between items-center text-xs font-bold text-[#10B981]">
-                    <span>Grand Finale: IPL Mega Championship 2026</span>
-                    <span className="font-mono">Oct 29</span>
-                  </div>
+                  <button
+                    onClick={() => {
+                      if (!privateRoomCodeInput.trim()) return alert('Please enter room code');
+                      navigate(`/room/${privateRoomCodeInput.trim()}`, {
+                        state: { password: privateRoomPasswordInput }
+                      });
+                    }}
+                    className="w-full py-2 bg-[#10B981] hover:bg-[#059669] text-[#090D16] rounded-[4px] font-display font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+                  >
+                    Enter Private Room
+                  </button>
                 </div>
+
+                {/* Authenticated user's private rooms list */}
+                {!user ? (
+                  <div className="p-5 text-center bg-[#111827] border border-[#1F2937] rounded-[6px] space-y-2">
+                    <p className="text-xs text-[#86948A] font-mono">Sign in to view your private rooms and invitations.</p>
+                    <button
+                      onClick={() => navigate('/login')}
+                      className="px-4 py-1.5 rounded-[4px] bg-[#10B981] text-[#090D16] font-display font-bold text-xs uppercase cursor-pointer"
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                ) : privateRoomsLoading ? (
+                  <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
+                    <RefreshCw size={20} className="animate-spin text-[#10B981] mx-auto mb-2" />
+                    <span className="text-xs text-[#86948A] font-mono">Loading private rooms...</span>
+                  </div>
+                ) : privateRooms.length === 0 ? (
+                  <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[6px]">
+                    <p className="text-xs text-[#86948A] mb-2 font-mono">No private rooms found for your account.</p>
+                    <small className="text-[11px] text-[#6B7280] block mb-3">Host a private room with a password or accept an invitation from a friend.</small>
+                    <button
+                      onClick={() => navigate('/create')}
+                      className="px-3.5 py-1.5 rounded-[4px] bg-[#10B981] text-[#090D16] font-display font-bold text-xs uppercase cursor-pointer"
+                    >
+                      Host Private Room
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {privateRooms.map((r: any) => (
+                      <div 
+                        key={r.room_code}
+                        className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-[6px] hover:border-[#10B981]/40 transition flex items-center justify-between gap-3 shadow-sm"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono font-bold text-[#10B981] text-xs">#{r.room_code}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono font-bold">PRIVATE</span>
+                            <span className="text-[10px] font-mono text-[#86948A]">● {r.status}</span>
+                          </div>
+                          <h4 className="font-display font-bold text-sm text-[#DFE2EF]">{r.room_name}</h4>
+                          <span className="text-[11px] text-[#86948A] font-mono">Slots: {r.teams_count || 0}/{r.max_teams || 10} Filled</span>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/room/${r.room_code}`)}
+                          className="px-3 py-1.5 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-bold text-xs uppercase cursor-pointer"
+                        >
+                          Join Room
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -855,211 +1082,390 @@ export default function Home() {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: FRIENDS (Renamed from Teams: Community Rosters & Franchises)       */}
+        {/* TAB 4: FRIENDS (Real Interactive Social System)                          */}
         {/* ========================================================================= */}
         {activeTab === 'friends' && (
           <div className="space-y-4 animate-fade-up">
             
-            {/* Centered Glowing Franchise Mascot Hero */}
-            <div className="text-center py-2 relative">
-              <div className="w-24 h-24 mx-auto mb-2 rounded-[6px] p-2.5 bg-[#111827] border border-[#1F2937] flex items-center justify-center relative shadow-[0_12px_32px_rgba(0,0,0,0.6)]">
-                <div className="absolute inset-0 rounded-[6px] bg-gradient-to-t from-[#10B981]/15 to-transparent pointer-events-none" />
-                <img 
-                  src={activeRoster.logo} 
-                  alt={activeRoster.name} 
-                  className="max-h-full max-w-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.6)]"
-                />
+            {/* Social Notification Banner */}
+            {socialNotice && (
+              <div className="p-2.5 rounded-[4px] bg-[#10B981]/20 border border-[#10B981]/40 text-[#10B981] text-xs font-mono font-bold text-center animate-fade-in">
+                {socialNotice}
               </div>
-              <h2 className="font-display font-extrabold text-lg text-[#DFE2EF]">
-                {activeRoster.name}
-              </h2>
-              <p className="text-[11px] text-[#86948A] font-mono font-bold">
-                Franchise Squad Roster · IPL 2026 Circuit
-              </p>
-            </div>
+            )}
 
-            {/* Subtabs: OVERVIEW / RESULTS / MATCHES */}
-            <div className="flex border-b border-[#1F2937] pb-1 gap-6 text-xs font-bold font-display uppercase tracking-wider">
-              <button 
-                onClick={() => setFriendsSubtab('overview')}
-                className={`pb-2 transition ${friendsSubtab === 'overview' ? 'text-[#DFE2EF] border-b-2 border-[#10B981]' : 'text-[#86948A] hover:text-[#DFE2EF]'}`}
-              >
-                OVERVIEW
-              </button>
-              <button 
-                onClick={() => setFriendsSubtab('results')}
-                className={`pb-2 transition ${friendsSubtab === 'results' ? 'text-[#DFE2EF] border-b-2 border-[#10B981]' : 'text-[#86948A] hover:text-[#DFE2EF]'}`}
-              >
-                RESULTS
-              </button>
-              <button 
-                onClick={() => setFriendsSubtab('matches')}
-                className={`pb-2 transition ${friendsSubtab === 'matches' ? 'text-[#DFE2EF] border-b-2 border-[#10B981]' : 'text-[#86948A] hover:text-[#DFE2EF]'}`}
-              >
-                MATCHES
-              </button>
-            </div>
-
-            {/* Franchise Filter Pills */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {['CSK', 'MI', 'RCB', 'KKR', 'DC', 'GT', 'RR', 'SRH'].map(code => (
-                <button
-                  key={code}
-                  onClick={() => setSelectedFranchise(code)}
-                  className={`px-3 py-1.5 rounded-[4px] text-xs font-extrabold font-display transition flex-shrink-0 ${
-                    selectedFranchise === code 
-                      ? 'bg-[#10B981] text-[#090D16] shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
-                      : 'bg-[#111827] text-[#86948A] border border-[#1F2937] hover:text-[#DFE2EF] hover:border-[#3C4A42]'
-                  }`}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
-
-            {/* Roster Cards List */}
-            <div className="space-y-2">
-              {activeRoster.players.map((p, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => openPlayerProfile(p, selectedFranchise, activeRoster.logo)}
-                  className="p-3 bg-[#111827] border border-[#1F2937] hover:border-[#10B981]/50 rounded-[6px] flex items-center gap-3 cursor-pointer transition group shadow-sm hover:bg-[#1A2234]"
-                >
-                  {/* Player Avatar */}
-                  <div className="w-12 h-12 rounded-[4px] bg-[#0F131C] border border-[#1F2937] overflow-hidden flex-shrink-0">
-                    <img 
-                      src={p.img} 
-                      alt={p.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition"
-                    />
-                  </div>
-
-                  {/* Player Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">{p.flag}</span>
-                      <span className="font-display font-bold text-sm text-[#DFE2EF] truncate">
-                        {p.name}
-                      </span>
-                      {p.isCap && <span className="text-[#F59E0B] text-xs">👑</span>}
-                    </div>
-                    <div className="text-[11px] text-[#86948A] font-mono truncate mt-0.5">
-                      {p.sub}
-                    </div>
-                  </div>
-
-                  {/* Role Badge */}
-                  <span className="bg-[#1C1F29] border border-[#1F2937] text-[#BBCABF] rounded-[3px] px-2 py-1 text-[10px] font-mono font-bold whitespace-nowrap">
-                    {p.role}
-                  </span>
+            {!user ? (
+              <div className="p-8 text-center bg-[#111827] border border-[#1F2937] rounded-[8px] space-y-3">
+                <div className="w-16 h-16 mx-auto rounded-full bg-[#10B981]/15 text-[#10B981] flex items-center justify-center">
+                  <Users size={32} />
                 </div>
-              ))}
-            </div>
+                <h3 className="font-display font-extrabold text-base text-white">Friends</h3>
+                <p className="text-xs text-[#86948A] max-w-xs mx-auto font-mono">
+                  Sign in or create an account to add friends with their Player Tag, see online status, and send game invites.
+                </p>
+                <GameButton
+                  onClick={() => navigate('/login')}
+                  variant="primary"
+                  size="md"
+                  fullWidth
+                  icon={<LogIn size={16} />}
+                >
+                  SIGN IN / REGISTER
+                </GameButton>
+              </div>
+            ) : (
+              <>
+                {/* Header & Search Bar */}
+                <div className="p-4 bg-[#111827] border border-[#1F2937] rounded-[8px] space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="font-display font-extrabold text-base text-white">Friends ({friendsList.length})</h2>
+                      <p className="text-[11px] text-[#86948A] font-mono">
+                        {friendsList.filter(f => f.is_online).length} Online now · Search by Player Tag
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-[4px] bg-[#0F131C] border border-[#1F2937] text-[10px] font-mono text-[#10B981] font-bold">
+                      Tag: {user.username}
+                    </span>
+                  </div>
+
+                  <form onSubmit={searchFriends} className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search size={14} className="absolute left-3 top-3 text-[#86948A]" />
+                      <input
+                        type="text"
+                        placeholder="Player Tag or Name..."
+                        value={friendsSearchQuery}
+                        onChange={(e) => setFriendsSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-[#0B1120] border border-[#1F2937] rounded-[4px] text-xs text-white focus:outline-none focus:border-[#10B981]"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={friendsSearchLoading}
+                      className="px-3.5 py-2 bg-[#10B981] hover:bg-[#059669] text-[#090D16] rounded-[4px] font-display font-bold text-xs uppercase cursor-pointer transition disabled:opacity-50"
+                    >
+                      {friendsSearchLoading ? <RefreshCw size={14} className="animate-spin" /> : 'Search'}
+                    </button>
+                  </form>
+
+                  {/* Search Results */}
+                  {friendsSearchResults.length > 0 && (
+                    <div className="pt-2 border-t border-[#1F2937] space-y-2">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase">Search Results</span>
+                      {friendsSearchResults.map((sr) => (
+                        <div key={sr.id} className="p-2.5 bg-[#0F131C] border border-[#1F2937] rounded-[4px] flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-lg">{sr.avatar_emoji || '🏏'}</span>
+                            <div className="min-w-0">
+                              <span className="text-xs font-display font-bold text-white block truncate">{sr.display_name}</span>
+                              <span className="text-[10px] font-mono text-[#86948A]">@{sr.username} · {sr.rank_name || 'Rookie'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            {sr.relationship === 'friend' ? (
+                              <span className="px-2 py-1 rounded bg-[#10B981]/20 text-[#10B981] text-[10px] font-mono font-bold">Friend ✓</span>
+                            ) : sr.relationship === 'pending_sent' ? (
+                              <span className="px-2 py-1 rounded bg-[#F59E0B]/20 text-[#F59E0B] text-[10px] font-mono font-bold">Request Sent</span>
+                            ) : sr.relationship === 'pending_received' ? (
+                              <span className="px-2 py-1 rounded bg-[#06B6D4]/20 text-[#06B6D4] text-[10px] font-mono font-bold">Check Requests</span>
+                            ) : (
+                              <button
+                                onClick={() => handleSendFriendRequest(sr.id)}
+                                className="px-2.5 py-1 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-bold text-xs cursor-pointer transition"
+                              >
+                                + Add Friend
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pending Requests Section (if any) */}
+                {incomingRequests.length > 0 && (
+                  <div className="p-3.5 bg-[#111827] border border-[#F59E0B]/40 rounded-[8px] space-y-2.5 shadow-sm">
+                    <span className="text-xs font-display font-bold text-[#F59E0B] uppercase tracking-wider block">
+                      Incoming Friend Requests ({incomingRequests.length})
+                    </span>
+                    <div className="space-y-2">
+                      {incomingRequests.map((req) => (
+                        <div key={req.id} className="p-2.5 bg-[#0F131C] border border-[#1F2937] rounded-[4px] flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-base">{req.sender_avatar || '🏏'}</span>
+                            <div className="min-w-0">
+                              <span className="text-xs font-display font-bold text-white block truncate">{req.sender_display_name}</span>
+                              <span className="text-[10px] font-mono text-[#86948A]">@{req.sender_username}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => handleRespondFriendRequest(req.id, 'accept')}
+                              className="px-2.5 py-1 rounded-[4px] bg-[#10B981] hover:bg-[#059669] text-[#090D16] font-display font-bold text-xs uppercase cursor-pointer"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRespondFriendRequest(req.id, 'reject')}
+                              className="px-2 py-1 rounded-[4px] bg-[#1F2937] hover:bg-[#EF4444] text-[#86948A] hover:text-white font-display font-bold text-xs uppercase cursor-pointer"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Accepted Friends List */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-xs font-display font-bold uppercase tracking-wider text-[#86948A]">
+                      Your Friends ({friendsList.length})
+                    </span>
+                    <button
+                      onClick={fetchFriends}
+                      className="text-xs font-mono text-[#10B981] hover:text-[#6FFBBE] flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw size={12} className={friendsLoading ? 'animate-spin' : ''} /> Refresh
+                    </button>
+                  </div>
+
+                  {friendsList.length === 0 ? (
+                    <div className="p-6 text-center bg-[#111827] border border-[#1F2937] rounded-[8px]">
+                      <Users size={24} className="text-[#86948A] mx-auto mb-2" />
+                      <p className="text-xs text-[#86948A] font-mono mb-1">No friends added yet.</p>
+                      <small className="text-[11px] text-[#6B7280] block">Search a player's Player Tag above to send a request.</small>
+                    </div>
+                  ) : (
+                    friendsList.map((f) => (
+                      <div
+                        key={f.id}
+                        className="p-3 bg-[#111827] border border-[#1F2937] hover:border-[#10B981]/40 rounded-[6px] flex items-center justify-between gap-3 transition shadow-sm"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Avatar with Online indicator */}
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-[6px] bg-[#0F131C] border border-[#1F2937] flex items-center justify-center text-lg">
+                              {f.avatar_emoji || '🏏'}
+                            </div>
+                            <span 
+                              className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#111827] ${
+                                f.is_online ? 'bg-[#10B981]' : 'bg-[#4B5563]'
+                              }`} 
+                              title={f.is_online ? 'Online' : 'Offline'}
+                            />
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-display font-bold text-sm text-white truncate">{f.display_name}</span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#0F131C] text-[#10B981] border border-[#10B981]/30">
+                                {f.rank_name || 'Rookie'}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-mono text-[#86948A] block mt-0.5 truncate">
+                              @{f.username} · {f.auctions_won || 0}W / {f.auctions_played || 0}G · ❤️ {f.likes_count || 0}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Friend Action Buttons */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleInviteToRoom(f.id)}
+                            className="px-2.5 py-1.5 rounded-[4px] bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 hover:bg-[#10B981] hover:text-[#090D16] font-display font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+                            title="Invite to Room"
+                          >
+                            Invite
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Remove ${f.display_name} from friends?`)) {
+                                handleRemoveFriend(f.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-[4px] text-[#86948A] hover:text-[#EF4444] transition cursor-pointer"
+                            title="Remove Friend"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
 
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 5: PROFILE (Inspected Player & User Profile)                          */}
+        {/* TAB 5: PROFILE (Real Player Profile & Career Record)                      */}
         {/* ========================================================================= */}
         {activeTab === 'profile' && (
           <div className="space-y-4 animate-fade-up">
             
-            {/* Studio Portrait Hero with Floating Team Badge */}
-            <div className="relative rounded-[8px] bg-[#111827] border border-[#1F2937] p-4 overflow-hidden shadow-xl">
-              <div className="flex gap-4 items-center">
-                <div className="w-20 h-20 rounded-[6px] bg-[#0F131C] border border-[#1F2937] overflow-hidden shadow-md flex-shrink-0">
-                  <img 
-                    src={inspectedPlayer.img} 
-                    alt={inspectedPlayer.name} 
-                    className="w-full h-full object-cover"
-                  />
+            {!user ? (
+              <div className="p-8 text-center bg-[#111827] border border-[#1F2937] rounded-[8px] space-y-3">
+                <div className="w-16 h-16 mx-auto rounded-full bg-[#10B981]/15 text-[#10B981] flex items-center justify-center">
+                  <User size={32} />
                 </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm">{inspectedPlayer.flag}</span>
-                    <span className="text-xs font-mono font-bold text-[#10B981]">
-                      {inspectedPlayer.teamCode}
-                    </span>
-                  </div>
-                  <h3 className="font-display font-black text-lg text-white truncate">
-                    {inspectedPlayer.name}
-                  </h3>
-                  <p className="text-xs text-[#86948A] truncate">
-                    {inspectedPlayer.role}
-                  </p>
-                </div>
+                <h3 className="font-display font-extrabold text-base text-white">Player Profile</h3>
+                <p className="text-xs text-[#86948A] max-w-xs mx-auto font-mono">
+                  Sign in or register your account to view your career stats, ranks, champion trophies, and profile likes.
+                </p>
+                <GameButton
+                  onClick={() => navigate('/login')}
+                  variant="primary"
+                  size="md"
+                  fullWidth
+                  icon={<LogIn size={16} />}
+                >
+                  SIGN IN / REGISTER PROFILE
+                </GameButton>
               </div>
-            </div>
-
-            {/* Subtabs: OVERVIEW / STATS / CAREER */}
-            <div className="flex border-b border-[#1F2937] pb-1 gap-6 text-xs font-bold font-display uppercase tracking-wider">
-              <button 
-                onClick={() => setProfileSubtab('overview')}
-                className={`pb-2 transition ${profileSubtab === 'overview' ? 'text-[#DFE2EF] border-b-2 border-[#10B981]' : 'text-[#86948A] hover:text-[#DFE2EF]'}`}
-              >
-                OVERVIEW
-              </button>
-              <button 
-                onClick={() => setProfileSubtab('stats')}
-                className={`pb-2 transition ${profileSubtab === 'stats' ? 'text-[#DFE2EF] border-b-2 border-[#10B981]' : 'text-[#86948A] hover:text-[#DFE2EF]'}`}
-              >
-                AUCTION STATS
-              </button>
-              <button 
-                onClick={() => setProfileSubtab('career')}
-                className={`pb-2 transition ${profileSubtab === 'career' ? 'text-[#DFE2EF] border-b-2 border-[#10B981]' : 'text-[#86948A] hover:text-[#DFE2EF]'}`}
-              >
-                CAREER
-              </button>
-            </div>
-
-            {/* Detail Rows */}
-            <div className="p-4 bg-[#111827] border border-[#1F2937] rounded-[6px] divide-y divide-[#1F2937] text-xs">
-              <div className="flex justify-between py-2.5">
-                <span className="text-[#86948A]">Full Name</span>
-                <b className="text-[#DFE2EF] font-display">{inspectedPlayer.name}</b>
-              </div>
-              <div className="flex justify-between py-2.5">
-                <span className="text-[#86948A]">Age</span>
-                <b className="text-[#DFE2EF] font-mono">{inspectedPlayer.age} Years</b>
-              </div>
-              <div className="flex justify-between py-2.5">
-                <span className="text-[#86948A]">Base Price</span>
-                <b className="text-[#10B981] font-mono font-bold">{inspectedPlayer.base}</b>
-              </div>
-              <div className="flex justify-between py-2.5">
-                <span className="text-[#86948A]">Primary Role</span>
-                <b className="text-[#DFE2EF]">{inspectedPlayer.category}</b>
-              </div>
-              <div className="flex justify-between py-2.5">
-                <span className="text-[#86948A]">T20 Strike Rate</span>
-                <b className="text-[#DFE2EF] font-mono">{inspectedPlayer.strikeRate}</b>
-              </div>
-            </div>
-
-            {/* Account Controls */}
-            {user ? (
-              <GameButton
-                onClick={handleSignOut}
-                variant="danger"
-                size="md"
-                fullWidth
-                icon={<LogOut size={16} />}
-              >
-                SIGN OUT ({user.username})
-              </GameButton>
             ) : (
-              <GameButton
-                onClick={() => navigate('/login')}
-                variant="primary"
-                size="md"
-                fullWidth
-                icon={<LogIn size={16} />}
-              >
-                SIGN IN / REGISTER PROFILE
-              </GameButton>
+              <>
+                {/* Profile Header Studio Card */}
+                <div className="relative rounded-[8px] bg-[#111827] border border-[#1F2937] p-4 overflow-hidden shadow-xl">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#10B981]/10 rounded-full blur-2xl pointer-events-none" />
+
+                  <div className="flex gap-4 items-center relative z-10">
+                    {/* User Avatar */}
+                    <div className="w-20 h-20 rounded-[8px] bg-[#0F131C] border-2 border-[#10B981] flex items-center justify-center text-4xl shadow-md flex-shrink-0">
+                      <span>{profileData?.avatar_emoji || user.avatar_emoji || '🏏'}</span>
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 rounded-[4px] bg-[#10B981]/20 border border-[#10B981]/40 text-[#10B981] text-[10px] font-mono font-bold">
+                          {profileData?.rank_name || user.rank_name || 'Rookie'} · LVL {profileData?.level || user.level || 1}
+                        </span>
+                      </div>
+
+                      <h3 className="font-display font-black text-lg text-white truncate">
+                        {profileData?.display_name || user.display_name}
+                      </h3>
+                      
+                      <div className="flex items-center gap-2 text-xs font-mono text-[#86948A] mt-0.5">
+                        <span>@{profileData?.username || user.username}</span>
+                        <span>·</span>
+                        <span 
+                          onClick={() => {
+                            navigator.clipboard.writeText(user.id);
+                            alert('Player ID copied to clipboard!');
+                          }}
+                          className="cursor-pointer hover:text-white flex items-center gap-1"
+                          title="Click to copy ID"
+                        >
+                          ID: {(user.id || '').slice(0, 8).toUpperCase()} <Copy size={11} />
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Like Profile Button */}
+                    <button
+                      onClick={handleToggleLike}
+                      disabled={likeInProgress}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-[6px] border transition cursor-pointer active:scale-95 flex-shrink-0 ${
+                        profileData?.has_liked
+                          ? 'bg-[#EF4444]/20 border-[#EF4444] text-[#EF4444]'
+                          : 'bg-[#0F131C] border-[#1F2937] text-[#86948A] hover:text-[#EF4444] hover:border-[#EF4444]/50'
+                      }`}
+                      title="Like Profile"
+                    >
+                      <Heart size={18} className={profileData?.has_liked ? 'fill-[#EF4444]' : 'fill-none'} />
+                      <span className="text-[10px] font-mono font-bold mt-1">
+                        {profileData?.likes_count ?? user.likes_count ?? 0}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* XP Progress to next Rank */}
+                  <div className="mt-4 pt-3 border-t border-[#1F2937]">
+                    <div className="flex justify-between items-center text-[10px] font-mono text-[#86948A] mb-1">
+                      <span>CAREER XP</span>
+                      <span className="text-[#10B981] font-bold">{profileData?.xp || user.xp || 0} XP</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-[#0F131C] overflow-hidden">
+                      <div 
+                        className="h-full bg-[#10B981] transition-all duration-500 rounded-full"
+                        style={{ width: `${Math.min(100, Math.max(8, ((profileData?.xp || user.xp || 0) % 1500) / 15))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Career Stats Grid */}
+                <div className="space-y-2">
+                  <span className="text-xs font-display font-bold uppercase tracking-wider text-[#86948A] px-1 block">
+                    Career Performance
+                  </span>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] text-center">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Games Played</span>
+                      <span className="text-xl font-display font-black text-white mt-0.5 block">
+                        {profileData?.auctions_played ?? user.auctions_played ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] text-center">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Wins (Champion)</span>
+                      <span className="text-xl font-display font-black text-[#10B981] mt-0.5 block">
+                        {profileData?.auctions_won ?? user.auctions_won ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] text-center">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Win Rate</span>
+                      <span className="text-xl font-display font-black text-[#F59E0B] mt-0.5 block">
+                        {profileData?.win_rate ?? 0}%
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] text-center">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Players Bought</span>
+                      <span className="text-xl font-display font-black text-white mt-0.5 block">
+                        {profileData?.total_players_bought ?? user.total_players_bought ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] text-center">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Blitz Games</span>
+                      <span className="text-xl font-display font-black text-[#06B6D4] mt-0.5 block">
+                        {profileData?.blitz_count ?? user.blitz_count ?? 0}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-[#111827] border border-[#1F2937] rounded-[6px] text-center">
+                      <span className="text-[10px] font-mono font-bold text-[#86948A] uppercase block">Mega Games</span>
+                      <span className="text-xl font-display font-black text-purple-400 mt-0.5 block">
+                        {profileData?.mega_count ?? user.mega_count ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account Controls */}
+                <div className="pt-2">
+                  <GameButton
+                    onClick={handleSignOut}
+                    variant="danger"
+                    size="md"
+                    fullWidth
+                    icon={<LogOut size={16} />}
+                  >
+                    SIGN OUT ({user.username})
+                  </GameButton>
+                </div>
+              </>
             )}
 
           </div>

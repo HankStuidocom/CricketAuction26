@@ -47,12 +47,19 @@ export async function safeFetch<T = any>(endpoint: string, options?: SafeFetchOp
 
   let lastError: Error | null = null;
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('ca26_token') : null;
+  const authHeaders: Record<string, string> = {};
+  if (token) {
+    authHeaders['Authorization'] = `Bearer ${token}`;
+  }
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(fullUrl, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders,
           ...options?.headers
         }
       });

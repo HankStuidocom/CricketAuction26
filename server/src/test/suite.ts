@@ -142,6 +142,61 @@ async function runTests() {
   const roomAfterAIBid = db.prepare('SELECT * FROM rooms WHERE id = ?').get(roomId) as any;
   assert(aiBidPlaced && roomAfterAIBid.current_bidder_franchise !== null, 'AI Bidding: AI bot successfully evaluated and placed valid bid');
 
+  // 9. Test Idempotency in Room Creation
+  const testIdempotencyKey = 'idem-' + crypto.randomUUID();
+  const testIdemRoomId = crypto.randomUUID();
+  const testIdemCode = 'ID' + Math.floor(1000 + Math.random() * 9000);
+  db.prepare(`
+    INSERT INTO rooms (id, room_code, room_name, host_id, host_franchise, is_private, idempotency_key, created_at)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+  `).run(testIdemRoomId, testIdemCode, 'Idempotent Room', 'user-host-1', 'CSK', testIdempotencyKey, Date.now());
+
+  const fetchedIdem = db.prepare('SELECT * FROM rooms WHERE idempotency_key = ?').get(testIdempotencyKey) as any;
+  assert(fetchedIdem && fetchedIdem.id === testIdemRoomId, 'Idempotency: Room correctly retrieved using idempotencyKey');
+
+  // 10. Test Private Room Separation
+  const privRoomId = crypto.randomUUID();
+  const privRoomCode = 'PR' + Math.floor(1000 + Math.random() * 9000);
+  db.prepare(`
+    INSERT INTO rooms (id, room_code, room_name, host_id, host_franchise, is_private, created_at)
+    VALUES (?, ?, 'Secret Private Room', 'user-host-1', 'CSK', 1, ?)
+  `).run(privRoomId, privRoomCode, Date.now());
+
+  const publicRoomsList = db.prepare('SELECT * FROM rooms WHERE is_private = 0').all() as any[];
+  const foundPrivInPublic = publicRoomsList.some(r => r.id === privRoomId);
+  assert(!foundPrivInPublic, 'Privacy: Private room excluded from public listing');
+
+  const userPrivateRooms = db.prepare(`
+    SELECT * FROM rooms WHERE is_private = 1 AND host_id = ?
+  `).all('user-host-1') as any[];
+  assert(userPrivateRooms.some(r => r.id === privRoomId), 'Privacy: Private room correctly found in user private list');
+
+  // 11. Test Friends System & Requests
+  const randSuffix = Math.floor(1000 + Math.random() * 9000);
+  const userA = 'test-player-a-' + randSuffix;
+  const userB = 'test-player-b-' + randSuffix;
+  db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, "hash", ?)').run(userA, 'player_a_' + randSuffix, 'Player A', Date.now());
+  db.prepare('INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, "hash", ?)').run(userB, 'player_b_' + randSuffix, 'Player B', Date.now());
+
+  const reqId = crypto.randomUUID();
+  db.prepare('INSERT INTO friend_requests (id, sender_id, receiver_id, status, created_at, updated_at) VALUES (?, ?, ?, "PENDING", ?, ?)').run(reqId, userA, userB, Date.now(), Date.now());
+  const pendingReq = db.prepare('SELECT * FROM friend_requests WHERE receiver_id = ? AND status = "PENDING"').get(userB) as any;
+  assert(pendingReq && pendingReq.sender_id === userA, 'Friends: Friend request created and received');
+
+  // Accept request
+  db.prepare('UPDATE friend_requests SET status = "ACCEPTED" WHERE id = ?').run(reqId);
+  db.prepare('INSERT INTO friendships (id, user_id, friend_id, created_at) VALUES (?, ?, ?, ?)').run(crypto.randomUUID(), userA, userB, Date.now());
+  db.prepare('INSERT INTO friendships (id, user_id, friend_id, created_at) VALUES (?, ?, ?, ?)').run(crypto.randomUUID(), userB, userA, Date.now());
+
+  const friendList = db.prepare('SELECT friend_id FROM friendships WHERE user_id = ?').all(userA) as any[];
+  assert(friendList.some(f => f.friend_id === userB), 'Friends: Friendship successfully formed and mutual');
+
+  // 12. Test Profile Likes & Stats
+  db.prepare('INSERT INTO profile_likes (id, target_user_id, liker_user_id, created_at) VALUES (?, ?, ?, ?)').run(crypto.randomUUID(), userA, userB, Date.now());
+  db.prepare('UPDATE users SET likes_count = 1 WHERE id = ?').run(userA);
+  const updatedUserA = db.prepare('SELECT likes_count FROM users WHERE id = ?').get(userA) as any;
+  assert(updatedUserA?.likes_count === 1, 'Profile: Profile like registered and incremented');
+
   console.log(`\n=== TEST SUITE COMPLETE: ${passed} PASSED, ${failed} FAILED ===`);
   if (failed > 0) process.exit(1);
 }

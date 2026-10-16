@@ -125,11 +125,79 @@ export function initializeDatabase() {
       created_at INTEGER NOT NULL,
       FOREIGN KEY (room_id) REFERENCES rooms(id)
     );
+
+    -- Friendships (accepted mutual friends)
+    CREATE TABLE IF NOT EXISTS friendships (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      friend_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE(user_id, friend_id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (friend_id) REFERENCES users(id)
+    );
+
+    -- Friend requests
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id TEXT PRIMARY KEY,
+      sender_id TEXT NOT NULL,
+      receiver_id TEXT NOT NULL,
+      status TEXT DEFAULT 'PENDING',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(sender_id, receiver_id),
+      FOREIGN KEY (sender_id) REFERENCES users(id),
+      FOREIGN KEY (receiver_id) REFERENCES users(id)
+    );
+
+    -- User blocks
+    CREATE TABLE IF NOT EXISTS user_blocks (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      blocked_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE(user_id, blocked_id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (blocked_id) REFERENCES users(id)
+    );
+
+    -- Room invites
+    CREATE TABLE IF NOT EXISTS room_invites (
+      id TEXT PRIMARY KEY,
+      room_id TEXT NOT NULL,
+      sender_id TEXT NOT NULL,
+      receiver_id TEXT NOT NULL,
+      status TEXT DEFAULT 'PENDING',
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (room_id) REFERENCES rooms(id),
+      FOREIGN KEY (sender_id) REFERENCES users(id),
+      FOREIGN KEY (receiver_id) REFERENCES users(id)
+    );
+
+    -- Profile likes (1 like per account per profile)
+    CREATE TABLE IF NOT EXISTS profile_likes (
+      id TEXT PRIMARY KEY,
+      target_user_id TEXT NOT NULL,
+      liker_user_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE(target_user_id, liker_user_id),
+      FOREIGN KEY (target_user_id) REFERENCES users(id),
+      FOREIGN KEY (liker_user_id) REFERENCES users(id)
+    );
   `);
 
-  try {
-    db.exec('ALTER TABLE rooms ADD COLUMN min_squad_size INTEGER DEFAULT 5');
-  } catch {
-    // Column already exists
-  }
+  const safeAlter = (sql: string) => {
+    try {
+      db.exec(sql);
+    } catch {
+      // Ignore if column or index already exists
+    }
+  };
+
+  safeAlter('ALTER TABLE rooms ADD COLUMN min_squad_size INTEGER DEFAULT 5');
+  safeAlter('ALTER TABLE rooms ADD COLUMN idempotency_key TEXT');
+  safeAlter('CREATE UNIQUE INDEX IF NOT EXISTS idx_rooms_idempotency_key ON rooms(idempotency_key)');
+  safeAlter('ALTER TABLE users ADD COLUMN mega_count INTEGER DEFAULT 0');
+  safeAlter('ALTER TABLE users ADD COLUMN blitz_count INTEGER DEFAULT 0');
+  safeAlter('ALTER TABLE users ADD COLUMN likes_count INTEGER DEFAULT 0');
 }

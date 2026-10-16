@@ -165,6 +165,7 @@ export function advanceToNextPlayer(roomId: string) {
         .run(nextPlayer.player_id, newDeadline, effectiveStatus, roomId);
     } else {
       db.prepare('UPDATE rooms SET status = ?, completed_at = ? WHERE id = ?').run('COMPLETED', Date.now(), roomId);
+      recordAuctionCompletion(roomId);
     }
   });
   tx();
@@ -248,6 +249,104 @@ export function deferCurrentPlayer(roomId: string, bumpPositions = 5) {
     return room;
   });
   return tx();
+}
+
+function calculateRankAndLevel(xp: number): { level: number; rank_name: string } {
+  if (xp >= 12000) return { level: 6, rank_name: 'Legend' };
+  if (xp >= 7000) return { level: 5, rank_name: 'Elite Manager' };
+  if (xp >= 3500) return { level: 4, rank_name: 'Auction Pro' };
+  if (xp >= 1500) return { level: 3, rank_name: 'Strategist' };
+  if (xp >= 500) return { level: 2, rank_name: 'Scout' };
+  return { level: 1, rank_name: 'Rookie' };
+}
+
+export function recordAuctionCompletion(roomId: string) {
+  try {
+    // 1. Guard against duplicate stats recording
+    const existingRecorded = db.prepare(`SELECT id FROM auction_events WHERE room_id = ? AND event_type = 'stats_recorded'`).get(roomId);
+    if (existingRecorded) return;
+
+    // 2. Count total players in auction queue to determine game mode (Blitz <= 40, Mega > 40)
+    const queueCountRow = db.prepare(`SELECT COUNT(*) as count FROM auction_queue WHERE room_id = ?`).get(roomId) as { count: number };
+    const isBlitz = (queueCountRow?.count || 0) <= 40;
+
+    // 3. Calculate team points and find champion franchise
+    const participants = db.prepare(`SELECT * FROM room_participants WHERE room_id = ?`).all(roomId) as any[];
+    if (!participants || participants.length === 0) return;
+
+    const teamScores = participants.map(p => {
+      const pointsRow = db.prepare(`
+        SELECT COALESCE(SUM(pl.game_points), 0) as pts
+        FROM squad_players sp
+        JOIN players pl ON pl.id = sp.player_id
+        WHERE sp.room_id = ? AND sp.franchise_id = ?
+      `).get(roomId, p.franchise_id) as any;
+
+      return {
+        ...p,
+        total_points: pointsRow?.pts || 0
+      };
+    });
+
+    // Sort by points desc, then by purse remaining desc
+    teamScores.sort((a, b) => {
+      if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+      return b.purse_remaining_lakhs - a.purse_remaining_lakhs;
+    });
+
+    const champion = teamScores[0];
+    const championUserId = (champion && !champion.is_ai && champion.user_id) ? champion.user_id : null;
+
+    // 4. Update stats for every human participant
+    const humanParticipants = participants.filter(p => !p.is_ai && p.user_id);
+    for (const p of humanParticipants) {
+      const user = db.prepare('SELECT id, xp, level, rank_name, auctions_played, auctions_won, blitz_count, mega_count FROM users WHERE id = ?').get(p.user_id) as any;
+      if (!user) continue;
+
+      const isWinner = championUserId && user.id === championUserId;
+      const xpEarned = isWinner ? 750 : 250;
+      const newXp = (user.xp || 0) + xpEarned;
+      const { level, rank_name } = calculateRankAndLevel(newXp);
+
+      const boughtRow = db.prepare('SELECT COUNT(*) as count FROM squad_players WHERE room_id = ? AND franchise_id = ?').get(roomId, p.franchise_id) as { count: number };
+      const playersBought = boughtRow?.count || 0;
+
+      db.prepare(`
+        UPDATE users
+        SET auctions_played = COALESCE(auctions_played, 0) + 1,
+            auctions_won = COALESCE(auctions_won, 0) + ?,
+            blitz_count = COALESCE(blitz_count, 0) + ?,
+            mega_count = COALESCE(mega_count, 0) + ?,
+            total_players_bought = COALESCE(total_players_bought, 0) + ?,
+            xp = ?,
+            level = ?,
+            rank_name = ?
+        WHERE id = ?
+      `).run(
+        isWinner ? 1 : 0,
+        isBlitz ? 1 : 0,
+        isBlitz ? 0 : 1,
+        playersBought,
+        newXp,
+        level,
+        rank_name,
+        user.id
+      );
+    }
+
+    // 5. Log stats_recorded event so it is idempotent
+    db.prepare(`
+      INSERT INTO auction_events (id, room_id, event_type, payload, created_at)
+      VALUES (?, ?, 'stats_recorded', ?, ?)
+    `).run(
+      crypto.randomUUID(),
+      roomId,
+      JSON.stringify({ champion: champion?.franchise_id, championUserId, isBlitz }),
+      Date.now()
+    );
+  } catch (err: any) {
+    console.error('[Stats] Error recording auction completion:', err.message);
+  }
 }
 
 

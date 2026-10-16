@@ -10,6 +10,8 @@ import db from './database/db';
 import authRoutes from './routes/auth';
 import roomRoutes from './routes/rooms';
 import adminRoutes from './routes/admin';
+import friendsRoutes from './routes/friends';
+import usersRoutes from './routes/users';
 
 const app = express();
 const httpServer = createServer(app);
@@ -64,6 +66,8 @@ async function startServer() {
   app.use('/api/auth', authRoutes);
   app.use('/api/rooms', roomRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/friends', friendsRoutes);
+  app.use('/api/users', usersRoutes);
 
   // Catch-all API 404 Handler (Guarantees JSON instead of HTML error pages)
   app.use('/api/*', (req: Request, res: Response) => {

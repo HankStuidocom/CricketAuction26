@@ -10,6 +10,9 @@ export interface User {
   auctions_played: number;
   auctions_won: number;
   total_players_bought: number;
+  mega_count?: number;
+  blitz_count?: number;
+  likes_count?: number;
   created_at: number;
 }
 
@@ -62,6 +65,7 @@ export interface Room {
   bid_deadline: number | null;
   auction_started_at: number | null;
   completed_at: number | null;
+  idempotency_key?: string | null;
   created_at: number;
 }
 

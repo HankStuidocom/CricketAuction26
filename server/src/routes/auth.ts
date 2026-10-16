@@ -3,9 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../database/db';
 import crypto from 'crypto';
+import { JWT_SECRET } from '../config';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret2026';
 
 router.post('/register', (req, res) => {
   const { username, displayName, password } = req.body;
