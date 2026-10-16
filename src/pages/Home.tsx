@@ -402,23 +402,34 @@ export default function Home() {
 
   const activeRoster = ROSTER_DATA[selectedFranchise] || ROSTER_DATA['CSK'];
 
+  // Filter out any legacy dummy/test/completed rooms
+  const isLegacyDummy = (r: any) => {
+    if (!r) return true;
+    if (r.status === 'COMPLETED' || r.status === 'CANCELLED') return true;
+    const code = (r.room_code || '').toUpperCase();
+    if (code.startsWith('TEST') || code.startsWith('ID') || code.startsWith('PR')) return true;
+    const name = (r.room_name || '').toLowerCase();
+    if (name.includes('arena') || name.includes('test') || name.includes('reliability') || name.includes('cv2sny')) return true;
+    return false;
+  };
+
   // FILTER RULES: Public & Currently Live Rooms (including paused)
   const publicLiveRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
     const isLive = ['IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED'].includes(r.status);
-    return isPublic && isLive;
+    return isPublic && isLive && !isLegacyDummy(r);
   });
 
   // FILTER RULES: Public Waiting Rooms (Lobby stage)
   const publicWaitingRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
-    return isPublic && r.status === 'LOBBY';
+    return isPublic && r.status === 'LOBBY' && !isLegacyDummy(r);
   });
 
   // Active Public Rooms (Lobby + Live + Paused)
   const activePublicRooms = publicRooms.filter(r => {
     const isPublic = !r.is_private || r.is_private === 0;
-    return isPublic && ['LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED'].includes(r.status);
+    return isPublic && ['LOBBY', 'IN_PROGRESS', 'LIVE', 'FINAL_ROUND', 'PAUSED'].includes(r.status) && !isLegacyDummy(r);
   });
 
   // Top Featured Room (Topmost active public live room)
